@@ -163,6 +163,12 @@ python -c "from mvsCamera.MvCameraControl_class import MvCamCtrldll; print(type(
 
 如果不是异常退出，通常说明 DLL 至少已被找到。
 
+如果你想先看程序会尝试哪些 SDK 路径，可执行：
+
+```powershell
+python -c "from mvsCamera import describe_mvs_sdk_candidates; print('\n'.join(describe_mvs_sdk_candidates()))"
+```
+
 ---
 
 ## 6. 检查相机能否被枚举
@@ -457,4 +463,3 @@ pip install -e .
 - 更稳定的数据采样策略
 - 更准确的区域标定
 - 更完整的异常处理和日志
-

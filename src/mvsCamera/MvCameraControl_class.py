@@ -16,6 +16,7 @@ if __package__ in (None, ""):
     from mvsCamera.MvErrorDefine_const import *
     from mvsCamera.PixelType_const import *
     from mvsCamera.PixelType_header import *
+    from mvsCamera.sdk_loader import MvsSdkLoadError, load_mvs_sdk_library
 else:
     from .CameraParams_const import *
     from .CameraParams_header import *
@@ -23,6 +24,7 @@ else:
     from .MvErrorDefine_const import *
     from .PixelType_const import *
     from .PixelType_header import *
+    from .sdk_loader import MvsSdkLoadError, load_mvs_sdk_library
 
 
 class _MissingSdkProxy:
@@ -32,26 +34,19 @@ class _MissingSdkProxy:
     def __getattr__(self, name: str):
         raise RuntimeError(
             "MvCamera SDK is unavailable. "
-            "Please run on Windows with MVS installed and keep "
-            f"{Path(__file__).with_name('MvCameraControl.dll')} accessible.",
+            "Please run on Windows with Hikrobot MVS installed. "
+            "If MVS is already installed, make sure its runtime DLL directories are present "
+            "and that Python bitness matches the SDK bitness.\n"
+            f"Loader details: {self._error}",
         ) from self._error
 
 
 def _load_sdk_library():
     sdk_path = Path(__file__).with_name("MvCameraControl.dll")
-    last_error = None
-    add_dll_directory = getattr(os, "add_dll_directory", None)
-    if add_dll_directory is not None and sdk_path.parent.exists():
-        try:
-            add_dll_directory(str(sdk_path.parent))
-        except OSError:
-            pass
-    for candidate in (str(sdk_path), "MvCameraControl.dll"):
-        try:
-            return ctypes.WinDLL(candidate)
-        except Exception as exc:
-            last_error = exc
-    return _MissingSdkProxy(last_error or RuntimeError("MvCameraControl.dll not found"))
+    try:
+        return load_mvs_sdk_library(sdk_path)
+    except MvsSdkLoadError as exc:
+        return _MissingSdkProxy(exc)
 
 
 def _encode_ascii(value):
