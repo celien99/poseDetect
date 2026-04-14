@@ -40,10 +40,15 @@ class _MissingSdkProxy:
 def _load_sdk_library():
     sdk_path = Path(__file__).with_name("MvCameraControl.dll")
     last_error = None
+    add_dll_directory = getattr(os, "add_dll_directory", None)
+    if add_dll_directory is not None and sdk_path.parent.exists():
+        try:
+            add_dll_directory(str(sdk_path.parent))
+        except OSError:
+            pass
     for candidate in (str(sdk_path), "MvCameraControl.dll"):
         try:
-            WinDLL = None
-            return WinDLL(candidate)
+            return ctypes.WinDLL(candidate)
         except Exception as exc:
             last_error = exc
     return _MissingSdkProxy(last_error or RuntimeError("MvCameraControl.dll not found"))

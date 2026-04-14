@@ -63,3 +63,28 @@ def test_load_runtime_config_preserves_mvs_source_string(tmp_path) -> None:
 
     assert runtime.inference is not None
     assert runtime.inference.source == "mvs://1?timeout_ms=300"
+
+
+def test_load_runtime_config_builds_collection_config(tmp_path) -> None:
+    config_path = tmp_path / "runtime.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "collection": {
+                    "pose_model_path": "model.pt",
+                    "source": "mvs://0?timeout_ms=1000",
+                    "output_dir": "datasets/seat_pose",
+                    "max_images": 20,
+                    "overwrite": True
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    runtime = load_runtime_config(str(config_path))
+
+    assert runtime.collection is not None
+    assert runtime.collection.pose_model_path == "model.pt"
+    assert runtime.collection.source == "mvs://0?timeout_ms=1000"
+    assert runtime.collection.max_images == 20

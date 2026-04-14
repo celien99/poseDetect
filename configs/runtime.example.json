@@ -1,13 +1,27 @@
 {
   "training": {
     "model_path": "yolo26n-pose.pt",
-    "data_config": "coco8-pose.yaml",
-    "epochs": 100,
+    "data_config": "datasets/seat_pose/dataset.yaml",
+    "epochs": 50,
     "image_size": 640,
-    "batch": 16,
-    "device": "cpu",
+    "batch": 8,
+    "device": "mps",
     "project": "runs/seat_pose",
     "name": "baseline"
+  },
+  "collection": {
+    "pose_model_path": "yolo26n-pose.pt",
+    "source": "mvs://0?timeout_ms=1000",
+    "output_dir": "datasets/seat_pose",
+    "dataset_yaml_path": "datasets/seat_pose/dataset.yaml",
+    "confidence": 0.25,
+    "iou": 0.45,
+    "device": "mps",
+    "save_every_n_frames": 15,
+    "max_images": 200,
+    "train_split": 0.8,
+    "random_seed": 42,
+    "overwrite": true
   },
   "rules": {
     "touch_hold_frames": 3,
@@ -23,7 +37,7 @@
   },
   "inference": {
     "pose_model_path": "yolo26n-pose.pt",
-    "source": "demo.mp4",
+    "source": "mvs://0?timeout_ms=1000",
     "output_json_path": "outputs/action_results.json",
     "output_video_path": "outputs/action_preview.mp4",
     "seat_model_path": null,

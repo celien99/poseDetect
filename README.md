@@ -54,6 +54,23 @@ Train by runtime config:
 python -m seat_inspection train --config configs/runtime.example.json
 ```
 
+## Dataset Collection
+
+Capture frames from an MVS camera or a video source, auto-label them with the current pose model, and build a YOLO pose dataset:
+
+```bash
+python -m seat_inspection collect --config configs/runtime.example.json
+```
+
+This command creates:
+
+- `datasets/seat_pose/images/train`
+- `datasets/seat_pose/images/val`
+- `datasets/seat_pose/labels/train`
+- `datasets/seat_pose/labels/val`
+- `datasets/seat_pose/dataset.yaml`
+- `datasets/seat_pose/capture_manifest.json`
+
 ## Inference
 
 Run video inference and export JSON results:
@@ -90,16 +107,22 @@ For your real seat inspection project, the dataset should include:
 
 Recommended rollout path:
 
-1. train a robust pose model for the operator;
-2. stabilize seat region calibration;
-3. tune action rules with production videos;
-4. add event logging, confidence thresholds, and review tools.
+1. run `collect` against the real camera angle to bootstrap a pose dataset;
+2. manually review and correct the generated labels when needed;
+3. run `train` on the generated `dataset.yaml`;
+4. run `infer` on the same camera setup and tune the rule thresholds.
 
 ## Testing
 
 ```bash
 pytest
 ```
+
+## Windows Test Machine Guide
+
+For Windows deployment and Hikrobot MVS camera bring-up, see:
+
+- [WINDOWS_TEST_GUIDE.md](WINDOWS_TEST_GUIDE.md)
 
 
 ## Editable Install

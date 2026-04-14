@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .config import InferenceConfig, RuleConfig, TrainingConfig
+from .config import CollectionConfig, InferenceConfig, RuleConfig, TrainingConfig
 from .schemas import BoundingBox, SeatRegions
 
 
@@ -13,6 +13,7 @@ from .schemas import BoundingBox, SeatRegions
 class RuntimeConfigBundle:
     training: TrainingConfig | None = None
     inference: InferenceConfig | None = None
+    collection: CollectionConfig | None = None
     rules: RuleConfig = field(default_factory=RuleConfig)
 
 
@@ -21,11 +22,13 @@ def load_runtime_config(path: str) -> RuntimeConfigBundle:
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
     training_payload = payload.get("training")
     inference_payload = payload.get("inference")
+    collection_payload = payload.get("collection")
     rules_payload = payload.get("rules", {})
 
     return RuntimeConfigBundle(
         training=_build_training_config(training_payload),
         inference=_build_inference_config(inference_payload),
+        collection=_build_collection_config(collection_payload),
         rules=RuleConfig(**rules_payload),
     )
 
@@ -43,6 +46,12 @@ def _build_inference_config(payload: dict[str, Any] | None) -> InferenceConfig |
     config_payload = dict(payload)
     config_payload["seat_regions"] = _build_seat_regions(config_payload["seat_regions"])
     return InferenceConfig(**config_payload)
+
+
+def _build_collection_config(payload: dict[str, Any] | None) -> CollectionConfig | None:
+    if payload is None:
+        return None
+    return CollectionConfig(**payload)
 
 
 def _build_seat_regions(payload: dict[str, Any]) -> SeatRegions:

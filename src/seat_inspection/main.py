@@ -18,6 +18,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Runtime config JSON path",
     )
 
+    collect_parser = subparsers.add_parser(
+        "collect",
+        help="Capture frames and auto-build a YOLO pose dataset",
+    )
+    collect_parser.add_argument(
+        "--config",
+        default="configs/runtime.example.json",
+        help="Runtime config JSON path",
+    )
+
     infer_parser = subparsers.add_parser("infer", help="Run video inference and export JSON")
     infer_parser.add_argument(
         "--config",
@@ -39,6 +49,19 @@ def main() -> None:
         if runtime_config.training is None:
             raise ValueError("Training config is missing in runtime config file")
         train_pose_model(runtime_config.training)
+        return
+
+    if args.command == "collect":
+        from seat_inspection.dataset_capture import capture_pose_dataset
+
+        if runtime_config.collection is None:
+            raise ValueError("Collection config is missing in runtime config file")
+        summary = capture_pose_dataset(runtime_config.collection)
+        print(
+            f"Dataset capture completed: {summary.saved_images} images saved "
+            f"({summary.train_images} train / {summary.val_images} val), "
+            f"dataset yaml: {summary.dataset_yaml_path}",
+        )
         return
 
     if args.command == "infer":

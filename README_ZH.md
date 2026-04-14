@@ -66,6 +66,7 @@ pip install -e .[dev]
 由于当前项目采用 `src` 目录结构，推荐统一使用如下命令：
 
 ```bash
+python -m seat_inspection collect --config configs/runtime.example.json
 python -m seat_inspection train --config configs/runtime.example.json
 ```
 
@@ -83,6 +84,8 @@ python -m seat_inspection infer --config configs/runtime.example.json
 - 避免根目录脚本和包内模块重复；
 - 更符合企业级 Python 项目结构；
 - 后续更容易演进为安装包或服务化部署。
+
+其中 `collect` 命令会从真实相机或视频源采集图像，并使用当前姿态模型自动生成一版 YOLO pose 数据集骨架。
 
 ## 六、运行配置说明
 
@@ -132,6 +135,21 @@ python -m seat_inspection infer --config configs/runtime.example.json
 
 ## 七、训练说明
 
+在训练之前，建议先采集真实产线数据：
+
+```bash
+python -m seat_inspection collect --config configs/runtime.example.json
+```
+
+该命令会自动生成：
+
+- `datasets/seat_pose/images/train`
+- `datasets/seat_pose/images/val`
+- `datasets/seat_pose/labels/train`
+- `datasets/seat_pose/labels/val`
+- `datasets/seat_pose/dataset.yaml`
+- `datasets/seat_pose/capture_manifest.json`
+
 执行训练：
 
 ```bash
@@ -170,6 +188,7 @@ python -m seat_inspection infer --config configs/runtime.example.json
 
 如果你要把这个项目真正用于产线，建议继续补充以下能力：
 
+- 对 `collect` 自动生成的伪标签做人工复核；
 - 座椅区域标定工具；
 - 实时摄像头流推理；
 - 动作事件按时间段聚合，而不是只输出逐帧结果；
@@ -191,12 +210,24 @@ pytest
 python3 -m compileall src tests
 ```
 
-## 十一、当前推荐命令汇总
+## 十一、Windows 测试机部署说明
+
+如果你要把项目放到 Windows 测试机，并连接海康工业相机，请优先阅读：
+
+- [WINDOWS_TEST_GUIDE.md](WINDOWS_TEST_GUIDE.md)
+
+## 十二、当前推荐命令汇总
 
 训练：
 
 ```bash
 python -m seat_inspection train --config configs/runtime.example.json
+```
+
+采集：
+
+```bash
+python -m seat_inspection collect --config configs/runtime.example.json
 ```
 
 推理：
@@ -212,7 +243,7 @@ python -m seat_inspection --help
 ```
 
 
-## 十二、可编辑安装说明
+## 十三、可编辑安装说明
 
 执行 `pip install -e .` 后，就不再需要 `PYTHONPATH=src`。
 

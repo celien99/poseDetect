@@ -74,3 +74,30 @@ class InferenceConfig:
     iou: float = 0.45
     device: str = "cpu"
     save_visualization: bool = False
+
+
+@dataclass(slots=True)
+class CollectionConfig:
+    """数据采集配置。
+
+    备注：
+    - `pose_model_path` 用于对采集帧做自动姿态伪标注，生成可直接训练的 YOLO pose 标签。
+    - `source` 支持视频文件、普通摄像头编号以及 `mvs://0` 这类海康工业相机源。
+    - `output_dir` 会生成 `images/train|val`、`labels/train|val` 和 `dataset.yaml`。
+    - `save_every_n_frames` 用于抽帧，避免连续帧过于相似。
+    - `max_images` 控制本次采集的最大图片数量，便于先跑通闭环。
+    - `overwrite` 为 `True` 时允许覆盖已存在的数据集目录。
+    """
+
+    pose_model_path: str
+    source: str
+    output_dir: str = "datasets/seat_pose"
+    dataset_yaml_path: str | None = None
+    confidence: float = 0.25
+    iou: float = 0.45
+    device: str = "cpu"
+    save_every_n_frames: int = 15
+    max_images: int = 200
+    train_split: float = 0.8
+    random_seed: int = 42
+    overwrite: bool = False
