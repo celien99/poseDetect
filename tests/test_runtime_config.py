@@ -38,3 +38,28 @@ def test_load_runtime_config_builds_nested_dataclasses(tmp_path) -> None:
     assert runtime.rules.touch_hold_frames == 2
     assert runtime.inference is not None
     assert runtime.inference.seat_regions.side_surface.x1 == 5.0
+
+
+def test_load_runtime_config_preserves_mvs_source_string(tmp_path) -> None:
+    config_path = tmp_path / "runtime.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "inference": {
+                    "pose_model_path": "model.pt",
+                    "source": "mvs://1?timeout_ms=300",
+                    "seat_regions": {
+                        "overall": {"x1": 1, "y1": 2, "x2": 3, "y2": 4},
+                        "side_surface": {"x1": 5, "y1": 6, "x2": 7, "y2": 8},
+                        "bottom_surface": {"x1": 9, "y1": 10, "x2": 11, "y2": 12}
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    runtime = load_runtime_config(str(config_path))
+
+    assert runtime.inference is not None
+    assert runtime.inference.source == "mvs://1?timeout_ms=300"

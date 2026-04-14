@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Protocol
 
 import cv2
-from ultralytics import YOLO
+
+from mvsCamera import is_mvs_source, open_mvs_capture
 
 from .config import InferenceConfig, RuleConfig
 from .engine import ActionRecognitionEngine
@@ -21,6 +22,20 @@ COCO_KEYPOINT_INDEX = {
 }
 
 
+class FrameCapture(Protocol):
+    def isOpened(self) -> bool:
+        ...
+
+    def read(self) -> tuple[bool, Any]:
+        ...
+
+    def release(self) -> None:
+        ...
+
+    def get(self, prop_id: int) -> float:
+        ...
+
+
 def run_rule_based_inference(
     observations: Iterable[FrameObservation],
     rule_config: RuleConfig | None = None,
@@ -33,9 +48,11 @@ def run_video_inference(
     config: InferenceConfig,
     rule_config: RuleConfig | None = None,
 ) -> list[ActionDecision]:
+    from ultralytics import YOLO
+
     model = YOLO(config.pose_model_path)
     engine = ActionRecognitionEngine(rule_config)
-    capture = cv2.VideoCapture(_resolve_source(config.source))
+    capture = _open_capture(config.source)
 
     if not capture.isOpened():
         raise ValueError(f"Unable to open inference source: {config.source}")
@@ -102,8 +119,14 @@ def _resolve_source(source: str) -> int | str:
     return source
 
 
+def _open_capture(source: str) -> FrameCapture:
+    if is_mvs_source(source):
+        return open_mvs_capture(source)
+    return cv2.VideoCapture(_resolve_source(source))
+
+
 def _build_writer(
-    capture: cv2.VideoCapture,
+    capture: FrameCapture,
     config: InferenceConfig,
 ) -> cv2.VideoWriter | None:
     if not config.save_visualization:

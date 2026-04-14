@@ -116,11 +116,19 @@ python -m seat_inspection infer --config configs/runtime.example.json
 用于推理运行，例如：
 
 - `pose_model_path`：姿态模型路径
-- `source`：视频文件、摄像头编号或视频流地址
+- `source`：视频文件、摄像头编号、视频流地址，或 `mvs://0` 这类海康 MVS 相机源
 - `seat_regions`：固定机位下的座椅区域标定
 - `output_json_path`：动作识别结果 JSON 输出路径
 - `output_video_path`：可视化视频输出路径
 - `save_visualization`：是否导出标注视频
+
+其中如果接入 `src/mvsCamera` 适配后的工业相机，可使用类似下面的配置：
+
+```json
+{
+  "source": "mvs://0?timeout_ms=1000"
+}
+```
 
 ## 七、训练说明
 

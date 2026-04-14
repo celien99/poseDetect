@@ -75,6 +75,8 @@ Output artifacts:
 - `rules` — action rule thresholds and hold-frame settings
 - `inference` — video source, seat regions, and output paths
 
+`inference.source` can now also point to an MVS industrial camera by using a source string such as `mvs://0?timeout_ms=1000`.
+
 For fixed industrial cameras, `seat_regions` should be calibrated from the real device view and versioned with your deployment package.
 
 ## Enterprise Implementation Notes
