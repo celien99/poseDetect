@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "seat-inspection"
+version = "0.1.0"
+description = "Enterprise seat inspection action recognition with YOLO pose"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "ultralytics",
+  "opencv-python",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+]
+
+[project.scripts]
+seat-inspection = "seat_inspection.main:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
