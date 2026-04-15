@@ -286,6 +286,7 @@ python3 -m compileall src tests
 - [docs/PROJECT_CAPABILITY_ASSESSMENT.md](docs/PROJECT_CAPABILITY_ASSESSMENT.md)：当前项目到底已经能做什么、哪些能力相对完善，以及当前需求下是否真的需要训练模型
 - [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md)：当前项目更合理的实施顺序，强调先跑通规则方案、后决定是否训练
 - [docs/PROJECT_STRUCTURE_AND_CONFIG_GUIDE.md](docs/PROJECT_STRUCTURE_AND_CONFIG_GUIDE.md)：后续迭代时推荐保持的目录结构、配置组织方式和命名规范
+- [docs/SEAT_REGION_CALIBRATION_GUIDE.md](docs/SEAT_REGION_CALIBRATION_GUIDE.md)：座椅区域标定到底该怎么画，如何判断是区域错了还是规则错了
 - [docs/MVS_CAMERA_USAGE.md](docs/MVS_CAMERA_USAGE.md)：`src/mvsCamera` 的模块定位、可实现功能、`mvs://` 资源格式，以及如何接入 `seat_inspection`
 - [docs/VIDEO_INFERENCE_GUIDE.md](docs/VIDEO_INFERENCE_GUIDE.md)：如何提供一份视频并输出动作流程检测结果
 - [docs/runtime.video.example.json](docs/runtime.video.example.json)：视频推理配置模板，可直接复制修改
