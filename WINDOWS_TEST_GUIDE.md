@@ -133,16 +133,17 @@ pip install -e .[dev]
 python -m seat_inspection --help
 ```
 
-预期能看到三个子命令：
+预期能看到四个子命令：
 
 - `collect`
 - `train`
 - `infer`
+- `infer-image`
 
 ### 5.2 检查 mvsCamera 模块导入
 
 ```powershell
-python -c "import mvsCamera.Basicdemo as demo; import mvsCamera.CamOperation_class as camop; import mvsCamera.MvCameraControl_class as sdk; print('ok')"
+python -c "from mvsCamera import HikCamera, open_mvs_capture, parse_mvs_source; import mvsCamera.MvCameraControl_class as sdk; print(parse_mvs_source('mvs://0').device_index, 'ok')"
 ```
 
 如果输出：
@@ -173,13 +174,13 @@ python -c "from mvsCamera import describe_mvs_sdk_candidates; print('\n'.join(de
 
 ## 6. 检查相机能否被枚举
 
-建议先用最基础的 demo 做设备枚举：
+建议先直接用当前封装做设备枚举：
 
 ```powershell
-python -m mvsCamera.Basicdemo
+python -c "from mvsCamera import HikCamera; cam = HikCamera(); print(cam.enumerate_devices()); cam.close()"
 ```
 
-运行后应至少看到设备数量和设备信息输出。
+运行后应至少看到标准化后的设备信息输出。
 
 如果这里直接失败，优先检查：
 
@@ -371,7 +372,7 @@ outputs\action_preview.mp4
 
 1. 海康客户端确认相机可见
 2. `python -m seat_inspection --help`
-3. `python -m mvsCamera.Basicdemo`
+3. `python -c "from mvsCamera import HikCamera; cam = HikCamera(); print(cam.enumerate_devices()); cam.close()"`
 4. `python -m seat_inspection collect --config configs/runtime.example.json`
 5. 检查 `datasets/seat_pose`
 6. `python -m seat_inspection train --config configs/runtime.example.json`

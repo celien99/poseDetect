@@ -136,6 +136,14 @@ For Windows deployment and Hikrobot MVS camera bring-up, see:
 
 - [WINDOWS_TEST_GUIDE.md](WINDOWS_TEST_GUIDE.md)
 
+## Documentation Index
+
+For a quick understanding of module responsibilities, supported capabilities, and integration flow, start with:
+
+- [docs/MVS_CAMERA_USAGE.md](docs/MVS_CAMERA_USAGE.md) — what `src/mvsCamera` does, how to use `mvs://` sources, and how it plugs into `seat_inspection`
+- [docs/VIDEO_INFERENCE_GUIDE.md](docs/VIDEO_INFERENCE_GUIDE.md) — how to run action-flow inference from a video file
+- [docs/runtime.video.example.json](docs/runtime.video.example.json) — ready-to-edit video inference config template
+
 
 ## Editable Install
 

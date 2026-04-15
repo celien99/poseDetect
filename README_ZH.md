@@ -237,7 +237,15 @@ python3 -m compileall src tests
 
 - [WINDOWS_TEST_GUIDE.md](WINDOWS_TEST_GUIDE.md)
 
-## 十二、当前推荐命令汇总
+## 十二、文档索引
+
+如果你要快速了解当前项目各模块的职责、能力边界和接入方式，建议按下面顺序阅读：
+
+- [docs/MVS_CAMERA_USAGE.md](docs/MVS_CAMERA_USAGE.md)：`src/mvsCamera` 的模块定位、可实现功能、`mvs://` 资源格式，以及如何接入 `seat_inspection`
+- [docs/VIDEO_INFERENCE_GUIDE.md](docs/VIDEO_INFERENCE_GUIDE.md)：如何提供一份视频并输出动作流程检测结果
+- [docs/runtime.video.example.json](docs/runtime.video.example.json)：视频推理配置模板，可直接复制修改
+
+## 十三、当前推荐命令汇总
 
 训练：
 
@@ -270,7 +278,7 @@ python -m seat_inspection --help
 ```
 
 
-## 十三、可编辑安装说明
+## 十四、可编辑安装说明
 
 执行 `pip install -e .` 后，就不再需要 `PYTHONPATH=src`。
 

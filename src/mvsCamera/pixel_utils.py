@@ -5,7 +5,7 @@ from ctypes import c_ubyte, memmove
 import numpy as np
 
 if __package__ in (None, ""):
-    from mvsCamera.MvCameraControl_header import (
+    from mvsCamera.sdk.MvCameraControl_header import (
         PixelType_Gvsp_BayerBG8,
         PixelType_Gvsp_BayerBG10,
         PixelType_Gvsp_BayerBG10_Packed,
@@ -36,7 +36,7 @@ if __package__ in (None, ""):
         PixelType_Gvsp_YUV422_YUYV_Packed,
     )
 else:
-    from .MvCameraControl_header import (
+    from .sdk.MvCameraControl_header import (
         PixelType_Gvsp_BayerBG8,
         PixelType_Gvsp_BayerBG10,
         PixelType_Gvsp_BayerBG10_Packed,
