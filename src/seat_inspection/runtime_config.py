@@ -10,15 +10,11 @@ from typing import Any
 from .config import (
     ActionConfig,
     CameraInferenceConfig,
-    CollectionConfig,
-    ImageInferenceConfig,
-    InferenceConfig,
     KeypointProcessingConfig,
     MultiCameraFusionConfig,
     MultiCameraInferenceConfig,
     RuleConfig,
     StateMachineConfig,
-    TrainingConfig,
     WorkflowStepConfig,
     build_default_rule_actions,
 )
@@ -27,73 +23,21 @@ from .schemas import BoundingBox, SeatRegions
 
 @dataclass(slots=True)
 class RuntimeConfigBundle:
-    """聚合训练、采集、视频推理和图片推理所需的运行配置。"""
+    """聚合多机位协同推理所需的运行配置。"""
 
-    training: TrainingConfig | None = None
-    inference: InferenceConfig | None = None
     multi_camera_inference: MultiCameraInferenceConfig | None = None
-    image_inference: ImageInferenceConfig | None = None
-    collection: CollectionConfig | None = None
     rules: RuleConfig = field(default_factory=RuleConfig)
 
 
 def load_runtime_config(path: str) -> RuntimeConfigBundle:
-    """从 JSON 文件加载整套运行配置。"""
+    """从 JSON 文件加载多机位协同推理配置。"""
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
-    training_payload = payload.get("training")
-    inference_payload = payload.get("inference")
-    multi_camera_inference_payload = payload.get("multi_camera_inference")
-    image_inference_payload = payload.get("image_inference")
-    collection_payload = payload.get("collection")
-    rules_payload = payload.get("rules", {})
-
     return RuntimeConfigBundle(
-        training=_build_training_config(training_payload),
-        inference=_build_inference_config(inference_payload),
-        multi_camera_inference=_build_multi_camera_inference_config(multi_camera_inference_payload),
-        image_inference=_build_image_inference_config(image_inference_payload),
-        collection=_build_collection_config(collection_payload),
-        rules=_build_rule_config(rules_payload),
+        multi_camera_inference=_build_multi_camera_inference_config(
+            payload.get("multi_camera_inference"),
+        ),
+        rules=_build_rule_config(payload.get("rules", {})),
     )
-
-
-def _build_training_config(payload: dict[str, Any] | None) -> TrainingConfig | None:
-    """构造训练配置，不存在时返回 `None`。"""
-    if payload is None:
-        return None
-    return TrainingConfig(**payload)
-
-
-def _build_inference_config(payload: dict[str, Any] | None) -> InferenceConfig | None:
-    """构造视频推理配置，并把区域字典转成结构化对象。"""
-    if payload is None:
-        return None
-
-    config_payload = dict(payload)
-    config_payload["seat_regions"] = _build_seat_regions(config_payload["seat_regions"])
-    config_payload["keypoint_processing"] = _build_keypoint_processing_config(
-        config_payload.get("keypoint_processing"),
-    )
-    config_payload["state_machine"] = _build_state_machine_config(
-        config_payload.get("state_machine"),
-    )
-    return InferenceConfig(**config_payload)
-
-
-def _build_image_inference_config(payload: dict[str, Any] | None) -> ImageInferenceConfig | None:
-    """构造单张图片推理配置。"""
-    if payload is None:
-        return None
-
-    config_payload = dict(payload)
-    config_payload["seat_regions"] = _build_seat_regions(config_payload["seat_regions"])
-    config_payload["keypoint_processing"] = _build_keypoint_processing_config(
-        config_payload.get("keypoint_processing"),
-    )
-    config_payload["state_machine"] = _build_state_machine_config(
-        config_payload.get("state_machine"),
-    )
-    return ImageInferenceConfig(**config_payload)
 
 
 def _build_multi_camera_inference_config(
@@ -118,13 +62,6 @@ def _build_multi_camera_inference_config(
         config_payload.get("state_machine"),
     )
     return MultiCameraInferenceConfig(**config_payload)
-
-
-def _build_collection_config(payload: dict[str, Any] | None) -> CollectionConfig | None:
-    """构造数据采集配置。"""
-    if payload is None:
-        return None
-    return CollectionConfig(**payload)
 
 
 def _build_keypoint_processing_config(payload: dict[str, Any] | None) -> KeypointProcessingConfig:

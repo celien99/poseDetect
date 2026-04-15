@@ -4,11 +4,11 @@ from pathlib import Path
 from typing import Any, Iterable
 
 import cv2
-from media_inputs import FrameStream, load_image_frame, open_frame_stream
+from media_inputs import FrameStream, open_frame_stream
 
 from .config import (
-    ImageInferenceConfig,
-    InferenceConfig,
+    CameraInferenceConfig,
+    KeypointProcessingConfig,
     MultiCameraInferenceConfig,
     RuleConfig,
     StateMachineConfig,
@@ -32,78 +32,6 @@ def run_rule_based_inference(
     """直接对结构化观测序列运行规则，不依赖 YOLO 模型。"""
     engine = ActionRecognitionEngine(rule_config)
     return engine.process_stream(observations)
-
-
-def run_video_inference(
-    config: InferenceConfig,
-    rule_config: RuleConfig | None = None,
-) -> list[ActionDecision]:
-    """对视频流或 MVS 相机流执行姿态推理与动作识别。"""
-    pipeline = _build_pipeline(config, rule_config)
-    stream = open_frame_stream(config.source)
-
-    if not stream.is_opened():
-        raise ValueError(f"Unable to open inference source: {config.source}")
-
-    writer = _build_writer(stream, config)
-    decisions: list[ActionDecision] = []
-    show_window = config.show_window
-
-    try:
-        while True:
-            media_frame = stream.read_frame()
-            if media_frame is None:
-                break
-
-            frame_result = pipeline.process_frame(
-                frame=media_frame.image,
-                frame_index=media_frame.frame_index,
-                snapshot=False,
-            )
-            decisions.append(frame_result.decision)
-
-            if writer is not None or show_window:
-                annotated = annotate_frame(
-                    media_frame.image,
-                    frame_result.seat_regions,
-                    frame_result.decision,
-                    frame_result.inspection_result,
-                    frame_result.person_detection,
-                )
-                if writer is not None:
-                    writer.write(annotated)
-                if show_window and _show_window(
-                    config.window_name,
-                    annotated,
-                    config.window_wait_ms,
-                    config.exit_key,
-                ):
-                    break
-    finally:
-        stream.release()
-        if writer is not None:
-            writer.release()
-        if show_window:
-            _destroy_window(config.window_name)
-
-    inspection_result = pipeline.finalize()
-
-    export_action_report(
-        config.output_json_path,
-        decisions,
-        metadata={
-            "source": config.source,
-            "pose_model_path": config.pose_model_path,
-            "person_model_path": config.person_model_path,
-            "seat_region_mode": pipeline.seat_region_provider.mode,
-            "seat_model_path": config.seat_model_path,
-            "save_visualization": config.save_visualization,
-            "show_window": config.show_window,
-            "mode": "video",
-        },
-        inspection_result=inspection_result,
-    )
-    return decisions
 
 
 def run_multi_camera_inference(
@@ -205,116 +133,45 @@ def run_multi_camera_inference(
     return decisions
 
 
-def run_image_inference(
-    config: ImageInferenceConfig,
-    rule_config: RuleConfig | None = None,
-) -> ActionDecision:
-    """对单张图片执行姿态推理与动作判断。"""
-    media_frame = load_image_frame(config.source)
-
-    pipeline = _build_pipeline(
-        InferenceConfig(
-            pose_model_path=config.pose_model_path,
-            source=config.source,
-            seat_regions=config.seat_regions,
-            output_json_path=config.output_json_path,
-            person_model_path=config.person_model_path,
-            seat_model_path=config.seat_model_path,
-            confidence=config.confidence,
-            iou=config.iou,
-            device=config.device,
-            save_visualization=config.save_visualization,
-            keypoint_processing=config.keypoint_processing,
-            state_machine=config.state_machine,
-        ),
-        rule_config,
-    )
-    frame_result = pipeline.process_frame(
-        frame=media_frame.image,
-        frame_index=media_frame.frame_index,
-        snapshot=True,
-    )
-    inspection_result = pipeline.finalize()
-
-    annotated_image_path = config.output_image_path
-    if config.save_visualization:
-        annotated_image_path = annotated_image_path or "outputs/action_image_preview.jpg"
-        annotated = annotate_frame(
-            media_frame.image,
-            frame_result.seat_regions,
-            frame_result.decision,
-            inspection_result,
-            frame_result.person_detection,
-        )
-        output_path = Path(annotated_image_path)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        cv2.imwrite(str(output_path), annotated)
-
-    export_action_report(
-        config.output_json_path,
-        [frame_result.decision],
-        metadata={
-            "source": config.source,
-            "pose_model_path": config.pose_model_path,
-            "person_model_path": config.person_model_path,
-            "seat_region_mode": pipeline.seat_region_provider.mode,
-            "seat_model_path": config.seat_model_path,
-            "save_visualization": config.save_visualization,
-            "output_image_path": annotated_image_path,
-            "mode": "image",
-        },
-        inspection_result=inspection_result,
-    )
-    return frame_result.decision
-
-
 def _build_pipeline(
-    config: InferenceConfig,
+    pose_model_path: str,
+    seat_regions,
+    person_model_path: str | None,
+    seat_model_path: str | None,
+    confidence: float,
+    iou: float,
+    device: str,
+    keypoint_processing: KeypointProcessingConfig,
+    state_machine: StateMachineConfig,
     rule_config: RuleConfig | None = None,
 ) -> InspectionPipeline:
     engine = ActionRecognitionEngine(
         rule_config,
-        config.keypoint_processing,
-        config.state_machine,
+        keypoint_processing,
+        state_machine,
     )
     return InspectionPipeline(
-        pose_estimator=PoseEstimator(config.pose_model_path),
+        pose_estimator=PoseEstimator(pose_model_path),
         seat_region_provider=build_seat_region_provider(
-            config.seat_regions,
-            config.seat_model_path,
-            confidence=config.confidence,
-            iou=config.iou,
-            device=config.device,
+            seat_regions,
+            seat_model_path,
+            confidence=confidence,
+            iou=iou,
+            device=device,
         ),
         engine=engine,
-        confidence=config.confidence,
-        iou=config.iou,
-        device=config.device,
-        person_detector=PersonDetector(config.person_model_path),
+        confidence=confidence,
+        iou=iou,
+        device=device,
+        person_detector=PersonDetector(person_model_path),
     )
 
 
 def _build_multi_camera_context(
     config: MultiCameraInferenceConfig,
-    camera_config,
+    camera_config: CameraInferenceConfig,
     rule_config: RuleConfig | None,
 ) -> dict[str, Any]:
-    per_camera_inference = InferenceConfig(
-        pose_model_path=camera_config.pose_model_path or config.pose_model_path,
-        source=camera_config.source,
-        seat_regions=camera_config.seat_regions,
-        output_json_path=config.output_json_path,
-        output_video_path=None,
-        person_model_path=camera_config.person_model_path or config.person_model_path,
-        seat_model_path=camera_config.seat_model_path or config.seat_model_path,
-        confidence=camera_config.confidence if camera_config.confidence is not None else config.confidence,
-        iou=camera_config.iou if camera_config.iou is not None else config.iou,
-        device=camera_config.device or config.device,
-        save_visualization=False,
-        show_window=False,
-        keypoint_processing=config.keypoint_processing,
-        state_machine=StateMachineConfig(enabled=False),
-    )
     stream = open_frame_stream(camera_config.source)
     if not stream.is_opened():
         raise ValueError(f"Unable to open inference source: {camera_config.source}")
@@ -322,25 +179,23 @@ def _build_multi_camera_context(
         "name": camera_config.name,
         "source": camera_config.source,
         "stream": stream,
-        "pipeline": _build_pipeline(per_camera_inference, rule_config),
+        "pipeline": _build_pipeline(
+            pose_model_path=camera_config.pose_model_path or config.pose_model_path,
+            seat_regions=camera_config.seat_regions,
+            person_model_path=camera_config.person_model_path or config.person_model_path,
+            seat_model_path=camera_config.seat_model_path or config.seat_model_path,
+            confidence=(
+                camera_config.confidence
+                if camera_config.confidence is not None
+                else config.confidence
+            ),
+            iou=camera_config.iou if camera_config.iou is not None else config.iou,
+            device=camera_config.device or config.device,
+            keypoint_processing=config.keypoint_processing,
+            state_machine=StateMachineConfig(enabled=False),
+            rule_config=rule_config,
+        ),
     }
-
-
-def _build_writer(
-    stream: FrameStream,
-    config: InferenceConfig,
-) -> cv2.VideoWriter | None:
-    """按输入视频尺寸创建可视化输出视频写入器。"""
-    if not config.save_visualization:
-        return None
-
-    output_path = config.output_video_path or "outputs/action_preview.mp4"
-    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-    width = int(stream.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(stream.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = stream.get(cv2.CAP_PROP_FPS) or 25.0
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    return cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
 
 def _build_canvas_writer(

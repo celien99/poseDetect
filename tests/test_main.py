@@ -1,5 +1,4 @@
 import argparse
-import sys
 from types import SimpleNamespace
 
 import seat_inspection.main as main_module
@@ -13,42 +12,49 @@ class StubParser:
         return self._namespace
 
 
-def test_main_calibrate_regions_does_not_require_config(monkeypatch) -> None:
-    captured: dict[str, str | None] = {}
+def test_main_infer_runs_multi_camera_entry(monkeypatch, capsys) -> None:
+    captured: dict[str, object] = {}
 
     monkeypatch.setattr(
         main_module,
         "build_parser",
         lambda: StubParser(
             argparse.Namespace(
-                command="calibrate-regions",
-                source="mvs://sn/DA9184658?timeout_ms=1000",
-                output="configs/seat_regions.cam_0.json",
-                window_name="seat-region-calibration",
+                command="infer",
+                config="configs/runtime.multi_camera.example.json",
             ),
         ),
     )
 
-    def fail_load_runtime_config(path: str) -> None:
-        raise AssertionError(f"load_runtime_config should not be called, got {path}")
-
-    monkeypatch.setattr(main_module, "load_runtime_config", fail_load_runtime_config)
-
-    fake_calibration_module = SimpleNamespace(
-        calibrate_seat_regions=lambda source, output_path, window_name: captured.update(
-            {
-                "source": source,
-                "output_path": output_path,
-                "window_name": window_name,
-            },
+    fake_runtime_config = SimpleNamespace(
+        multi_camera_inference=SimpleNamespace(
+            output_json_path="outputs/multi_camera_action_results.json",
         ),
+        rules="rules-config",
     )
-    monkeypatch.setitem(sys.modules, "seat_inspection.calibration", fake_calibration_module)
+    monkeypatch.setattr(
+        main_module,
+        "load_runtime_config",
+        lambda path: captured.update({"config_path": path}) or fake_runtime_config,
+    )
+
+    import sys
+
+    fake_inference_module = SimpleNamespace(
+        run_multi_camera_inference=lambda config, rules: captured.update(
+            {
+                "runtime_config": config,
+                "rules": rules,
+            },
+        )
+        or [object(), object()],
+    )
+    monkeypatch.setitem(sys.modules, "seat_inspection.inference", fake_inference_module)
 
     main_module.main()
 
-    assert captured == {
-        "source": "mvs://sn/DA9184658?timeout_ms=1000",
-        "output_path": "configs/seat_regions.cam_0.json",
-        "window_name": "seat-region-calibration",
-    }
+    stdout = capsys.readouterr().out
+    assert captured["config_path"] == "configs/runtime.multi_camera.example.json"
+    assert captured["runtime_config"] is fake_runtime_config.multi_camera_inference
+    assert captured["rules"] == "rules-config"
+    assert "2 fused frames processed" in stdout

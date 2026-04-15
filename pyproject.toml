@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "seat-inspection"
 version = "0.1.0"
-description = "Enterprise seat inspection action recognition with YOLO pose"
+description = "Multi-camera collaborative seat inspection with YOLO pose"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

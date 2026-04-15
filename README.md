@@ -1,43 +1,36 @@
 # poseDetect
 
-Enterprise-oriented skeleton for seat inspection operator action detection based on Ultralytics YOLO pose models.
+This repository now targets one mode only: multi-camera, multi-view collaborative seat inspection.
 
-## Target Scenario
+## Scope
 
-The system verifies whether an operator follows the required inspection procedure around a seat-testing device, for example:
+The retained runtime path is:
 
-- touching the seat side surface with a hand;
-- lifting the seat bottom for inspection;
-- extending to more SOP-driven actions in later phases.
+1. open multiple video or MVS camera streams;
+2. run pose estimation per camera;
+3. evaluate action rules per camera;
+4. fuse actions across views with `any`, `all`, or `majority`;
+5. advance one shared workflow state machine and export a fused JSON report.
 
-## Recommended Technical Architecture
-
-This repository adopts a two-stage design suitable for enterprise projects:
-
-1. `YOLO pose model` extracts operator keypoints.
-2. `Seat region definitions` describe operational zones such as side surface and bottom surface.
-3. `Rule engine` converts pose + region geometry into auditable action decisions.
-4. `Training and inference modules` remain separated for maintainability and future service deployment.
-5. `JSON report output` enables integration with MES, traceability, and post-event review.
-
-This design is easier to validate and explain than trying to train a single end-to-end action class directly from limited industrial data.
+Single-camera inference, image inference, calibration, dataset collection, and training have been removed.
 
 ## Project Structure
 
-- `src/seat_inspection/main.py` — enterprise entry for training and inference
-- `src/seat_inspection/__main__.py` — package entry for `python -m seat_inspection`
-- `configs/runtime.example.json` — enterprise runtime config example
-- `src/seat_inspection/config.py` — training, rule, and inference configuration with remarks
-- `src/seat_inspection/runtime_config.py` — JSON config loader
-- `src/seat_inspection/training.py` — YOLO pose training wrapper
-- `src/seat_inspection/inference.py` — video inference and JSON export
-- `src/seat_inspection/rules.py` — industrial action rule evaluator
-- `src/seat_inspection/engine.py` — action recognition engine
-- `src/seat_inspection/reporting.py` — action report writer
-- `tests/test_rules.py` — rule-based action tests
-- `tests/test_runtime_config.py` — runtime config parsing tests
+- `src/seat_inspection/main.py` — CLI entry with `infer`
+- `src/seat_inspection/inference.py` — multi-camera orchestration
+- `src/seat_inspection/multi_camera.py` — cross-camera fusion
+- `src/seat_inspection/pipeline.py` — per-camera processing pipeline
+- `src/seat_inspection/rules.py` — action rule evaluation
+- `src/seat_inspection/state_machine.py` — fused workflow status
+- `src/seat_inspection/reporting.py` — JSON report export
+- `src/media_inputs/` — unified stream abstraction
+- `src/mvsCamera/` — Hikrobot MVS access layer
+- `configs/runtime.multi_camera.example.json` — editable example config
+- `configs/runtime.multi_camera.mvs.json` — MVS-oriented example config
 
-## Quick Start
+## Environment
+
+Use Python 3.10+.
 
 ```bash
 python3 -m venv .venv
@@ -46,129 +39,42 @@ pip install -e .
 pip install -e .[dev]
 ```
 
-## Training
-
-Train by runtime config:
+## Run
 
 ```bash
-python -m seat_inspection train --config configs/runtime.example.json
+python -m seat_inspection infer --config configs/runtime.multi_camera.example.json
 ```
 
-## Dataset Collection
-
-Capture frames from an MVS camera or a video source, auto-label them with the current pose model, and build a YOLO pose dataset:
+Or:
 
 ```bash
-python -m seat_inspection collect --config configs/runtime.example.json
+seat-inspection infer --config configs/runtime.multi_camera.example.json
 ```
-
-This command creates:
-
-- `datasets/seat_pose/images/train`
-- `datasets/seat_pose/images/val`
-- `datasets/seat_pose/labels/train`
-- `datasets/seat_pose/labels/val`
-- `datasets/seat_pose/dataset.yaml`
-- `datasets/seat_pose/capture_manifest.json`
-
-## Inference
-
-Run video inference and export JSON results:
-
-```bash
-python -m seat_inspection infer --config configs/runtime.example.json
-```
-
-Run single-image inference:
-
-```bash
-python -m seat_inspection infer-image --config configs/runtime.example.json
-```
-
-Output artifacts:
-
-- `outputs/action_results.json` — frame-by-frame action decisions
-- `outputs/action_preview.mp4` — annotated review video when `save_visualization` is enabled
 
 ## Runtime Config
 
-`configs/runtime.example.json` can contain these sections:
+Only two top-level sections are kept:
 
-- `training` — YOLO training parameters
-- `collection` — frame capture and auto-label dataset generation
-- `rules` — action definitions and rule thresholds
-- `inference` — video source, seat regions, and output paths
-- `multi_camera_inference` — multi-camera fusion inference settings
-- `image_inference` — single-image source, seat regions, and output paths
+- `rules`
+- `multi_camera_inference`
 
-`inference.source` can now also point to an MVS industrial camera by using a source string such as `mvs://0?timeout_ms=1000`.
+Each camera under `multi_camera_inference.cameras` defines:
 
-`rules.actions` can define custom actions without changing Python code. The built-in action kinds are:
+- `name`
+- `source`
+- `seat_regions`
+- optional per-camera overrides for pose model, person model, seat model, confidence, IoU, and device
 
-- `touch_region`
-- `lift_region`
+Shared multi-camera settings define:
 
-For fixed industrial cameras, `seat_regions` should be calibrated from the real device view and versioned with your deployment package.
+- default pose model
+- fusion strategy
+- workflow state machine
+- visualization output
+- live preview behavior
 
-## Recommended Rollout
+## Notes
 
-For the current project scope, training is usually not the first step.
-
-Recommended order:
-
-1. start with an existing YOLO pose checkpoint;
-2. calibrate `seat_regions`;
-3. tune `rules.actions`;
-4. tune `state_machine.steps`;
-5. validate on real production videos;
-6. only start training if the generic pose model is not stable enough on-site.
-
-## Enterprise Implementation Notes
-
-For your real seat inspection project, the dataset should include:
-
-- operator pose samples from the actual production camera angle;
-- seat detection or manually defined seat regions;
-- SOP action definitions with acceptance criteria;
-- video segments for normal, missed, and incorrect actions.
-
-Recommended rollout path:
-
-1. run `collect` against the real camera angle to bootstrap a pose dataset;
-2. manually review and correct the generated labels when needed;
-3. run `train` on the generated `dataset.yaml`;
-4. run `infer` on the same camera setup and tune the rule thresholds.
-
-## Testing
-
-```bash
-pytest
-```
-
-## Windows Test Machine Guide
-
-For Windows deployment and Hikrobot MVS camera bring-up, see:
-
-- [WINDOWS_TEST_GUIDE.md](WINDOWS_TEST_GUIDE.md)
-
-## Documentation Index
-
-For a quick understanding of module responsibilities, supported capabilities, and integration flow, start with:
-
-- [docs/PROJECT_CAPABILITY_ASSESSMENT.md](docs/PROJECT_CAPABILITY_ASSESSMENT.md) — what the project can do today, which parts are mature, and whether training is actually necessary for the current scope
-- [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) — recommended rollout order for a real deployment, with rule tuning ahead of model training
-- [docs/PROJECT_STRUCTURE_AND_CONFIG_GUIDE.md](docs/PROJECT_STRUCTURE_AND_CONFIG_GUIDE.md) — recommended project structure, config organization, and naming conventions for future iterations
-- [docs/MVS_CAMERA_USAGE.md](docs/MVS_CAMERA_USAGE.md) — what `src/mvsCamera` does, how to use `mvs://` sources, and how it plugs into `seat_inspection`
-- [docs/VIDEO_INFERENCE_GUIDE.md](docs/VIDEO_INFERENCE_GUIDE.md) — how to run action-flow inference from a video file
-- [docs/runtime.video.example.json](docs/runtime.video.example.json) — ready-to-edit video inference config template
-
-
-## Editable Install
-
-After `pip install -e .`, you can also use the console command:
-
-```bash
-seat-inspection --help
-seat-inspection train --config configs/runtime.example.json
-seat-inspection infer --config configs/runtime.example.json
-```
+- `mvs://...` industrial camera sources are supported.
+- Fixed seat regions remain the default mode.
+- `seat_model_path` can still be enabled to map template seat regions from a detected overall seat box.
