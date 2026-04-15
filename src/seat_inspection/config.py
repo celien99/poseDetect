@@ -144,6 +144,8 @@ class MultiCameraInferenceConfig:
     window_name: str = "seat-inspection-multi"
     window_wait_ms: int = 1
     exit_key: str = "q"
+    max_consecutive_read_failures: int = 3
+    min_active_cameras: int = 1
     fusion: MultiCameraFusionConfig = field(default_factory=MultiCameraFusionConfig)
     keypoint_processing: KeypointProcessingConfig = field(default_factory=KeypointProcessingConfig)
     state_machine: StateMachineConfig = field(default_factory=StateMachineConfig)

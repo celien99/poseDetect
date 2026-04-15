@@ -14,6 +14,8 @@ def test_load_runtime_config_builds_multi_camera_bundle(tmp_path) -> None:
                 "multi_camera_inference": {
                     "pose_model_path": "pose.pt",
                     "show_window": True,
+                    "max_consecutive_read_failures": 5,
+                    "min_active_cameras": 2,
                     "fusion": {
                         "touch_action_strategy": "any",
                         "lift_action_strategy": "majority",
@@ -62,6 +64,8 @@ def test_load_runtime_config_builds_multi_camera_bundle(tmp_path) -> None:
     assert runtime.multi_camera_inference.keypoint_processing.smoothing_window == 5
     assert runtime.multi_camera_inference.state_machine.steps[0].name == "step1"
     assert runtime.multi_camera_inference.cameras[0].seat_regions.side_surface.x1 == 5.0
+    assert runtime.multi_camera_inference.max_consecutive_read_failures == 5
+    assert runtime.multi_camera_inference.min_active_cameras == 2
 
 
 def test_load_runtime_config_builds_multi_camera_inference(tmp_path) -> None:

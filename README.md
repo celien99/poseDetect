@@ -69,6 +69,8 @@ Shared multi-camera settings define:
 
 - default pose model
 - fusion strategy
+- minimum active camera count
+- consecutive read failure tolerance
 - workflow state machine
 - visualization output
 - live preview behavior
@@ -78,3 +80,5 @@ Shared multi-camera settings define:
 - `mvs://...` industrial camera sources are supported.
 - Fixed seat regions remain the default mode.
 - `seat_model_path` can still be enabled to map template seat regions from a detected overall seat box.
+- The runtime now prefers the operator closest to the seat region when multiple people appear.
+- Exported JSON reports include contiguous action segments and per-camera runtime stats.

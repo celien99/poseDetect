@@ -60,7 +60,7 @@ class InspectionPipeline:
             iou=self.iou,
             device=self.device,
         )
-        person_detection = self._detect_person(frame, pose_result)
+        person_detection = self._detect_person(frame, pose_result, seat_regions)
         observation = build_observation_from_pose_result(
             frame_index=frame_index,
             result=pose_result,
@@ -118,7 +118,12 @@ class InspectionPipeline:
         self.engine.reset_frame_context()
         return decision, self.engine.update_state(decision)
 
-    def _detect_person(self, frame: Any, pose_result: Any) -> PersonDetection | None:
+    def _detect_person(
+        self,
+        frame: Any,
+        pose_result: Any,
+        seat_regions: SeatRegions,
+    ) -> PersonDetection | None:
         """优先走独立人体检测，否则回退到姿态结果的人体框。"""
         if self.person_detector.enabled:
             return self.person_detector.detect(
@@ -126,5 +131,9 @@ class InspectionPipeline:
                 confidence=self.confidence,
                 iou=self.iou,
                 device=self.device,
+                reference_box=seat_regions.overall,
             )
-        return self.person_detector.extract_from_pose_result(pose_result)
+        return self.person_detector.extract_from_pose_result(
+            pose_result,
+            reference_box=seat_regions.overall,
+        )

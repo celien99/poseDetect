@@ -39,6 +39,10 @@ def export_action_report(
                 action_name: _collect_reason_counts(decisions, action_name)
                 for action_name in action_names
             },
+            "action_segments": {
+                action_name: _collect_action_segments(decisions, action_name)
+                for action_name in action_names
+            },
             "final_status": inspection_result.status if inspection_result is not None else None,
             "current_state": inspection_result.current_state if inspection_result is not None else None,
             "completed_steps": inspection_result.completed_steps if inspection_result is not None else [],
@@ -66,3 +70,37 @@ def _collect_reason_counts(
             continue
         counts[reason] = counts.get(reason, 0) + 1
     return counts
+
+
+def _collect_action_segments(
+    decisions: list[ActionDecision],
+    action_name: str,
+) -> list[dict[str, int]]:
+    segments: list[dict[str, int]] = []
+    start_frame: int | None = None
+    previous_frame: int | None = None
+
+    for decision in decisions:
+        detected = decision.actions.get(action_name, False)
+        if detected and start_frame is None:
+            start_frame = decision.frame_index
+        if not detected and start_frame is not None and previous_frame is not None:
+            segments.append(
+                {
+                    "start_frame": start_frame,
+                    "end_frame": previous_frame,
+                    "length": previous_frame - start_frame + 1,
+                },
+            )
+            start_frame = None
+        previous_frame = decision.frame_index
+
+    if start_frame is not None and previous_frame is not None:
+        segments.append(
+            {
+                "start_frame": start_frame,
+                "end_frame": previous_frame,
+                "length": previous_frame - start_frame + 1,
+            },
+        )
+    return segments

@@ -69,8 +69,7 @@ class _CaptureFrameStream:
 
         self._frame_index += 1
         height, width = image.shape[:2]
-        timestamp = self._capture.get(cv2.CAP_PROP_POS_MSEC)
-        timestamp_ms = float(timestamp) if timestamp else None
+        timestamp_ms = _resolve_timestamp_ms(self._capture, self._frame_index)
         return MediaFrame(
             frame_index=self._frame_index,
             image=image,
@@ -141,3 +140,15 @@ def load_image_frame(source: str) -> MediaFrame:
         height=int(height),
         timestamp_ms=None,
     )
+
+
+def _resolve_timestamp_ms(capture: Any, frame_index: int) -> float | None:
+    """优先读取真实时间戳，缺失时按 FPS 合成时间轴。"""
+    timestamp = float(capture.get(cv2.CAP_PROP_POS_MSEC))
+    if timestamp > 0:
+        return timestamp
+
+    fps = float(capture.get(cv2.CAP_PROP_FPS))
+    if fps > 0:
+        return max(0.0, (frame_index - 1) * 1000.0 / fps)
+    return None

@@ -32,4 +32,11 @@ def test_export_action_report_includes_action_reason_counts(tmp_path) -> None:
         "wrist_not_in_region": 1,
         "detected": 1,
     }
+    assert payload["summary"]["action_segments"]["touch_side_surface"] == [
+        {
+            "start_frame": 2,
+            "end_frame": 2,
+            "length": 1,
+        },
+    ]
     assert "touch_side_surface_frames" not in payload["summary"]

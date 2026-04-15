@@ -23,6 +23,8 @@
     "window_name": "seat-inspection-multi",
     "window_wait_ms": 1,
     "exit_key": "q",
+    "max_consecutive_read_failures": 3,
+    "min_active_cameras": 2,
     "fusion": {
       "default_action_strategy": "any",
       "touch_action_strategy": "any",

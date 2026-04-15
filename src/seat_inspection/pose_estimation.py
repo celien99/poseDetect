@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from .schemas import FrameObservation, Point, PoseSample, SeatRegions
+from .schemas import BoundingBox, FrameObservation, Point, PoseSample, SeatRegions
+from .selection import select_primary_box_index
 
 COCO_KEYPOINT_INDEX = {
     "left_shoulder": 5,
@@ -48,7 +49,7 @@ def build_observation_from_pose_result(
     seat_regions: SeatRegions,
 ) -> FrameObservation | None:
     """从姿态模型结果构建动作引擎所需观测对象。"""
-    pose = extract_primary_pose(result)
+    pose = extract_primary_pose(result, reference_box=seat_regions.overall)
     if pose is None:
         return None
 
@@ -59,7 +60,10 @@ def build_observation_from_pose_result(
     )
 
 
-def extract_primary_pose(result: Any) -> PoseSample | None:
+def extract_primary_pose(
+    result: Any,
+    reference_box: BoundingBox | None = None,
+) -> PoseSample | None:
     """选取置信度最高的人体姿态结果。"""
     keypoints = getattr(result, "keypoints", None)
     if keypoints is None or keypoints.data is None:
@@ -71,9 +75,13 @@ def extract_primary_pose(result: Any) -> PoseSample | None:
 
     boxes = getattr(result, "boxes", None)
     selected_index = 0
-    if boxes is not None and boxes.conf is not None:
-        confidences = boxes.conf.cpu().numpy()
-        selected_index = int(confidences.argmax())
+    if boxes is not None and getattr(boxes, "xyxy", None) is not None:
+        confidences = boxes.conf.cpu().numpy() if boxes.conf is not None else None
+        selected_index = select_primary_box_index(
+            boxes.xyxy.cpu().numpy(),
+            confidences,
+            reference_box=reference_box,
+        )
 
     pose_data = keypoint_data[selected_index]
     return PoseSample(

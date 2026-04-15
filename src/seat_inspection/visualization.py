@@ -20,7 +20,12 @@ def annotate_frame(
     annotated = frame.copy()
 
     if person_detection is not None:
-        draw_box(annotated, person_detection.bounding_box, (0, 165, 255), "person")
+        label = (
+            f"person:{person_detection.track_id}"
+            if person_detection.track_id is not None
+            else "person"
+        )
+        draw_box(annotated, person_detection.bounding_box, (0, 165, 255), label)
     draw_box(annotated, seat_regions.overall, (0, 255, 0), "seat")
     draw_box(annotated, seat_regions.side_surface, (255, 255, 0), "side")
     draw_box(annotated, seat_regions.bottom_surface, (255, 0, 255), "bottom")
@@ -39,6 +44,18 @@ def annotate_frame(
         2,
         cv2.LINE_AA,
     )
+
+    if decision.operator_association_id is not None:
+        cv2.putText(
+            annotated,
+            f"operator={decision.operator_association_id}",
+            (20, 150),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.7,
+            (0, 200, 255),
+            2,
+            cv2.LINE_AA,
+        )
 
     diagnostic_lines = _build_diagnostic_lines(decision)
     for index, line in enumerate(diagnostic_lines[:2], start=1):

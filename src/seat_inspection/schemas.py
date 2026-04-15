@@ -78,6 +78,7 @@ class PersonDetection:
 
     bounding_box: BoundingBox
     confidence: float
+    track_id: str | None = None
 
 
 @dataclass(slots=True)
@@ -90,6 +91,9 @@ class ActionDecision:
     reasons: dict[str, str] = field(default_factory=dict)  # 通用动作名到当前判定原因的映射
     diagnostics: dict[str, dict[str, float | int | bool | str]] = field(default_factory=dict)
     # 通用动作名到诊断特征的映射
+    operator_track_ids: dict[str, str] = field(default_factory=dict)
+    operator_association_id: str | None = None
+    active_cameras: list[str] = field(default_factory=list)
 
     @property
     def touch_side_surface(self) -> bool:

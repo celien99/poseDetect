@@ -78,6 +78,8 @@ seat-inspection infer --config configs/runtime.multi_camera.example.json
 
 - 默认姿态模型
 - 多机位融合策略
+- 最低活跃相机数量
+- 连续读帧失败容忍次数
 - 状态机流程
 - 可视化输出
 - 实时窗口显示
@@ -87,3 +89,5 @@ seat-inspection infer --config configs/runtime.multi_camera.example.json
 - 支持 `mvs://...` 形式的工业相机源。
 - 默认仍使用固定 `seat_regions`。
 - 如需按座椅整体检测结果动态映射区域，仍可启用 `seat_model_path`。
+- 当画面里出现多个人时，当前会优先选择更靠近座椅区域的主操作者。
+- 导出的 JSON 报告已包含连续动作片段和每路相机运行统计。

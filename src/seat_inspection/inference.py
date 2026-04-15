@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
 import cv2
+import numpy as np
 from media_inputs import FrameStream, open_frame_stream
 
 from .config import (
@@ -22,7 +24,26 @@ from .region_provider import build_seat_region_provider
 from .reporting import export_action_report
 from .schemas import ActionDecision, FrameObservation
 from .state_machine import InspectionStateMachine
+from .tracking import (
+    MultiCameraOperatorAssociator,
+    OperatorTrackAssignment,
+    PrimaryOperatorTracker,
+)
 from .visualization import annotate_frame
+
+
+@dataclass(slots=True)
+class CameraRuntimeStats:
+    """单路相机在多机位推理过程中的运行统计。"""
+
+    name: str
+    source: str
+    active: bool = True
+    frames_processed: int = 0
+    dropped_frames: int = 0
+    consecutive_failures: int = 0
+    last_timestamp_ms: float | None = None
+    last_status: str = "idle"
 
 
 def run_rule_based_inference(
@@ -44,6 +65,7 @@ def run_multi_camera_inference(
 
     camera_contexts = [_build_multi_camera_context(config, camera_config, rule_config) for camera_config in config.cameras]
     fused_state_machine = InspectionStateMachine(config.state_machine)
+    operator_associator = MultiCameraOperatorAssociator()
     decisions: list[ActionDecision] = []
     writer: cv2.VideoWriter | None = None
     show_window = config.show_window
@@ -53,9 +75,44 @@ def run_multi_camera_inference(
         while True:
             frame_cycle_index += 1
             cycle_data: list[dict[str, Any]] = []
-            for context in camera_contexts:
+            for context in [item for item in camera_contexts if item["stats"].active]:
                 media_frame = context["stream"].read_frame()
                 if media_frame is None:
+                    stats = context["stats"]
+                    stats.dropped_frames += 1
+                    stats.consecutive_failures += 1
+                    stats.last_status = "missing"
+                    if stats.consecutive_failures > max(0, config.max_consecutive_read_failures):
+                        stats.active = False
+                        stats.last_status = "offline"
+                    continue
+
+                stats = context["stats"]
+                stats.frames_processed += 1
+                stats.consecutive_failures = 0
+                stats.last_timestamp_ms = media_frame.timestamp_ms
+                stats.last_status = "ok"
+
+                frame_result = context["pipeline"].process_frame(
+                    frame=media_frame.image,
+                    frame_index=media_frame.frame_index,
+                    snapshot=False,
+                )
+                operator_assignment = context["tracker"].update(
+                    media_frame.frame_index,
+                    frame_result.person_detection,
+                )
+                cycle_data.append(
+                    {
+                        "context": context,
+                        "media_frame": media_frame,
+                        "frame_result": frame_result,
+                        "operator_assignment": operator_assignment,
+                    },
+                )
+
+            if len(cycle_data) < max(1, config.min_active_cameras):
+                if _count_active_cameras(camera_contexts) < max(1, config.min_active_cameras):
                     inspection_result = fused_state_machine.finalize()
                     export_action_report(
                         config.output_json_path,
@@ -64,19 +121,7 @@ def run_multi_camera_inference(
                         inspection_result=inspection_result,
                     )
                     return decisions
-
-                frame_result = context["pipeline"].process_frame(
-                    frame=media_frame.image,
-                    frame_index=media_frame.frame_index,
-                    snapshot=False,
-                )
-                cycle_data.append(
-                    {
-                        "context": context,
-                        "media_frame": media_frame,
-                        "frame_result": frame_result,
-                    },
-                )
+                continue
 
             fused_decision = fuse_camera_decisions(
                 [
@@ -91,11 +136,28 @@ def run_multi_camera_inference(
                 frame_index=frame_cycle_index,
                 fusion_config=config.fusion,
             )
+            operator_association = operator_associator.update(
+                [
+                    assignment
+                    for assignment in (
+                        item["operator_assignment"]
+                        for item in cycle_data
+                    )
+                    if assignment is not None
+                ],
+            )
+            fused_decision.operator_track_ids = dict(operator_association.camera_track_ids)
+            fused_decision.operator_association_id = operator_association.association_id
+            fused_decision.active_cameras = [
+                item["context"]["name"]
+                for item in cycle_data
+            ]
             decisions.append(fused_decision)
             fused_inspection_result = fused_state_machine.update(fused_decision)
 
             if writer is not None or show_window or config.save_visualization:
                 canvas = _render_multi_camera_canvas(
+                    camera_contexts,
                     cycle_data,
                     fused_decision,
                     fused_inspection_result,
@@ -179,6 +241,11 @@ def _build_multi_camera_context(
         "name": camera_config.name,
         "source": camera_config.source,
         "stream": stream,
+        "stats": CameraRuntimeStats(
+            name=camera_config.name,
+            source=camera_config.source,
+        ),
+        "tracker": PrimaryOperatorTracker(camera_config.name),
         "pipeline": _build_pipeline(
             pose_model_path=camera_config.pose_model_path or config.pose_model_path,
             seat_regions=camera_config.seat_regions,
@@ -243,6 +310,10 @@ def _build_multi_camera_metadata(
         "pose_model_path": config.pose_model_path,
         "person_model_path": config.person_model_path,
         "seat_model_path": config.seat_model_path,
+        "min_active_cameras": config.min_active_cameras,
+        "max_consecutive_read_failures": config.max_consecutive_read_failures,
+        "target_selection_strategy": "seat_proximity",
+        "operator_association_strategy": "persistent_primary_operator",
         "save_visualization": config.save_visualization,
         "show_window": config.show_window,
         "fusion": {
@@ -255,6 +326,12 @@ def _build_multi_camera_metadata(
             {
                 "name": context["name"],
                 "source": context["source"],
+                "active": context["stats"].active,
+                "frames_processed": context["stats"].frames_processed,
+                "dropped_frames": context["stats"].dropped_frames,
+                "consecutive_failures": context["stats"].consecutive_failures,
+                "last_timestamp_ms": context["stats"].last_timestamp_ms,
+                "last_status": context["stats"].last_status,
             }
             for context in camera_contexts
         ],
@@ -262,11 +339,12 @@ def _build_multi_camera_metadata(
 
 
 def _render_multi_camera_canvas(
+    camera_contexts: list[dict[str, Any]],
     cycle_data: list[dict[str, Any]],
     fused_decision: ActionDecision,
     fused_inspection_result,
 ) -> Any:
-    annotated_frames: list[Any] = []
+    annotated_frames_by_name: dict[str, Any] = {}
     for item in cycle_data:
         annotated = annotate_frame(
             item["media_frame"].image,
@@ -285,6 +363,14 @@ def _render_multi_camera_canvas(
             2,
             cv2.LINE_AA,
         )
+        annotated_frames_by_name[item["context"]["name"]] = annotated
+
+    reference_frame = next(iter(annotated_frames_by_name.values()))
+    annotated_frames: list[Any] = []
+    for context in camera_contexts:
+        annotated = annotated_frames_by_name.get(context["name"])
+        if annotated is None:
+            annotated = _build_camera_placeholder(context, reference_frame.shape)
         annotated_frames.append(annotated)
 
     canvas = _compose_frame_grid(annotated_frames)
@@ -312,6 +398,34 @@ def _render_multi_camera_canvas(
         cv2.LINE_AA,
     )
     return canvas
+
+
+def _build_camera_placeholder(context: dict[str, Any], reference_shape: tuple[int, ...]) -> Any:
+    height, width = reference_shape[:2]
+    placeholder = np.zeros((height, width, 3), dtype="uint8")
+    stats = context["stats"]
+    status_text = f"{context['name']} {stats.last_status}"
+    cv2.putText(
+        placeholder,
+        status_text,
+        (20, 40),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.9,
+        (255, 255, 255),
+        2,
+        cv2.LINE_AA,
+    )
+    cv2.putText(
+        placeholder,
+        f"dropped={stats.dropped_frames} failures={stats.consecutive_failures}",
+        (20, 80),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.7,
+        (180, 180, 180),
+        2,
+        cv2.LINE_AA,
+    )
+    return placeholder
 
 
 def _compose_frame_grid(frames: list[Any]) -> Any:
@@ -343,3 +457,7 @@ def _resolve_writer_fps(streams: list[FrameStream]) -> float:
         if fps:
             return fps
     return 25.0
+
+
+def _count_active_cameras(camera_contexts: list[dict[str, Any]]) -> int:
+    return sum(1 for context in camera_contexts if context["stats"].active)

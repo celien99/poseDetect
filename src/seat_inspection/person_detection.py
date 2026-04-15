@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 from .schemas import BoundingBox, PersonDetection
+from .selection import select_primary_box_index
 
 
 class PersonDetector:
@@ -34,6 +35,7 @@ class PersonDetector:
         confidence: float,
         iou: float,
         device: str,
+        reference_box: BoundingBox | None = None,
     ) -> PersonDetection | None:
         """使用独立模型执行人体检测。"""
         if self.model_path is None:
@@ -51,14 +53,21 @@ class PersonDetector:
             device=device,
             verbose=False,
         )[0]
-        return extract_primary_person_detection(result)
+        return extract_primary_person_detection(result, reference_box=reference_box)
 
-    def extract_from_pose_result(self, pose_result: Any) -> PersonDetection | None:
+    def extract_from_pose_result(
+        self,
+        pose_result: Any,
+        reference_box: BoundingBox | None = None,
+    ) -> PersonDetection | None:
         """从姿态模型结果中提取主人体框。"""
-        return extract_primary_person_detection(pose_result)
+        return extract_primary_person_detection(pose_result, reference_box=reference_box)
 
 
-def extract_primary_person_detection(result: Any) -> PersonDetection | None:
+def extract_primary_person_detection(
+    result: Any,
+    reference_box: BoundingBox | None = None,
+) -> PersonDetection | None:
     """从 YOLO 结果中提取置信度最高的人体框。"""
     boxes = getattr(result, "boxes", None)
     if boxes is None or getattr(boxes, "xyxy", None) is None:
@@ -70,9 +79,15 @@ def extract_primary_person_detection(result: Any) -> PersonDetection | None:
 
     selected_index = 0
     confidence = 1.0
+    confidences = None
     if boxes.conf is not None:
         confidences = boxes.conf.cpu().numpy()
-        selected_index = max(range(len(confidences)), key=lambda index: float(confidences[index]))
+    selected_index = select_primary_box_index(
+        xyxy,
+        confidences,
+        reference_box=reference_box,
+    )
+    if confidences is not None:
         confidence = float(confidences[selected_index])
 
     x1, y1, x2, y2 = xyxy[selected_index]
