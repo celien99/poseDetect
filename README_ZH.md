@@ -126,13 +126,14 @@ python -m seat_inspection calibrate-regions --source "mvs://0?timeout_ms=1000" -
 
 用于动作规则判定，例如：
 
-- `touch_hold_frames`：触摸侧面动作连续成立帧数
-- `lift_hold_frames`：抬起底部动作连续成立帧数
-- `wrist_to_surface_margin`：手腕接近侧面的容忍距离
-- `wrist_to_bottom_margin`：手腕接近底部的容忍距离
-- `lift_ratio_threshold`：抬起动作判定阈值
+- `actions`：动作列表，每个动作可单独配置 `kind`、`region`、`hold_frames`
+- `wrist_margin`：单个动作的手腕区域容忍距离
+- `lift_ratio_threshold`：单个抬起动作的判定阈值
+- `min_wrist_confidence` / `min_shoulder_confidence` / `min_hip_confidence`：关键点置信度门限
+- `reach_ratio_threshold`：触达动作的最小伸展比例
+- `max_action_gap_frames`：视频流中允许的连续漏检帧数
 
-另外也支持 `rules.actions` 配置动作列表，当前内置两种动作类型：
+当前内置两种动作类型：
 
 - `touch_region`
 - `lift_region`
@@ -282,6 +283,9 @@ python3 -m compileall src tests
 
 如果你要快速了解当前项目各模块的职责、能力边界和接入方式，建议按下面顺序阅读：
 
+- [docs/PROJECT_CAPABILITY_ASSESSMENT.md](docs/PROJECT_CAPABILITY_ASSESSMENT.md)：当前项目到底已经能做什么、哪些能力相对完善，以及当前需求下是否真的需要训练模型
+- [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md)：当前项目更合理的实施顺序，强调先跑通规则方案、后决定是否训练
+- [docs/PROJECT_STRUCTURE_AND_CONFIG_GUIDE.md](docs/PROJECT_STRUCTURE_AND_CONFIG_GUIDE.md)：后续迭代时推荐保持的目录结构、配置组织方式和命名规范
 - [docs/MVS_CAMERA_USAGE.md](docs/MVS_CAMERA_USAGE.md)：`src/mvsCamera` 的模块定位、可实现功能、`mvs://` 资源格式，以及如何接入 `seat_inspection`
 - [docs/VIDEO_INFERENCE_GUIDE.md](docs/VIDEO_INFERENCE_GUIDE.md)：如何提供一份视频并输出动作流程检测结果
 - [docs/runtime.video.example.json](docs/runtime.video.example.json)：视频推理配置模板，可直接复制修改

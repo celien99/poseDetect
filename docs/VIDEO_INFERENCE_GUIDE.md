@@ -94,6 +94,12 @@ pip install -e .[dev]
 - `touch_side_surface`
 - `lift_seat_bottom`
 
+每个动作项里建议重点关注：
+
+- `hold_frames`
+- `wrist_margin`
+- `lift_ratio_threshold`，仅 `lift_region` 需要
+
 ### `inference.state_machine.steps`
 
 这里定义流程顺序。  
@@ -290,4 +296,3 @@ python -m seat_inspection.main infer --config docs/runtime.video.demo.json
 - `seat_regions`
 - `rules.actions`
 - `state_machine.steps`
-

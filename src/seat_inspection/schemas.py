@@ -85,10 +85,21 @@ class ActionDecision:
     """单帧动作判定结果。"""
 
     frame_index: int
-    touch_side_surface: bool = False
-    lift_seat_bottom: bool = False
     actions: dict[str, bool] = field(default_factory=dict)  # 通用动作名到判定状态的映射
     scores: dict[str, float] = field(default_factory=dict)  # 通用动作名到置信分数的映射
+    reasons: dict[str, str] = field(default_factory=dict)  # 通用动作名到当前判定原因的映射
+    diagnostics: dict[str, dict[str, float | int | bool | str]] = field(default_factory=dict)
+    # 通用动作名到诊断特征的映射
+
+    @property
+    def touch_side_surface(self) -> bool:
+        """兼容旧访问方式，内部统一委托到通用动作字典。"""
+        return self.actions.get("touch_side_surface", False)
+
+    @property
+    def lift_seat_bottom(self) -> bool:
+        """兼容旧访问方式，内部统一委托到通用动作字典。"""
+        return self.actions.get("lift_seat_bottom", False)
 
 
 @dataclass(slots=True)

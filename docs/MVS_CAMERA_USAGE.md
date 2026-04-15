@@ -27,8 +27,6 @@
 - [src/mvsCamera/camera_controller.py](/Users/yyh/code/poseDetect/src/mvsCamera/camera_controller.py)
 - [src/mvsCamera/frame_source.py](/Users/yyh/code/poseDetect/src/mvsCamera/frame_source.py)
 - [src/mvsCamera/pixel_utils.py](/Users/yyh/code/poseDetect/src/mvsCamera/pixel_utils.py)
-- [src/mvsCamera/MvCameraControl_class.py](/Users/yyh/code/poseDetect/src/mvsCamera/MvCameraControl_class.py)
-- [src/mvsCamera/sdk_loader.py](/Users/yyh/code/poseDetect/src/mvsCamera/sdk_loader.py)
 
 ### SDK 底层映射层
 
@@ -361,4 +359,3 @@ cap.release()
 一句话理解它在整个项目中的位置：
 
 它是输入层，不是识别层。
-

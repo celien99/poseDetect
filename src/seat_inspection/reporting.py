@@ -35,16 +35,10 @@ def export_action_report(
                 ]
                 for action_name in action_names
             },
-            "touch_side_surface_frames": [
-                decision.frame_index
-                for decision in decisions
-                if decision.touch_side_surface
-            ],
-            "lift_seat_bottom_frames": [
-                decision.frame_index
-                for decision in decisions
-                if decision.lift_seat_bottom
-            ],
+            "action_reason_counts": {
+                action_name: _collect_reason_counts(decisions, action_name)
+                for action_name in action_names
+            },
             "final_status": inspection_result.status if inspection_result is not None else None,
             "current_state": inspection_result.current_state if inspection_result is not None else None,
             "completed_steps": inspection_result.completed_steps if inspection_result is not None else [],
@@ -59,3 +53,16 @@ def export_action_report(
         json.dumps(report, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+
+
+def _collect_reason_counts(
+    decisions: list[ActionDecision],
+    action_name: str,
+) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for decision in decisions:
+        reason = decision.reasons.get(action_name)
+        if reason is None:
+            continue
+        counts[reason] = counts.get(reason, 0) + 1
+    return counts

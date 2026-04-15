@@ -47,8 +47,6 @@ def fuse_camera_decisions(
 
     return ActionDecision(
         frame_index=frame_index,
-        touch_side_surface=actions.get("touch_side_surface", False),
-        lift_seat_bottom=actions.get("lift_seat_bottom", False),
         actions=actions,
         scores=scores,
     )

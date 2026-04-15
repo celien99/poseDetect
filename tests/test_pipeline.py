@@ -1,5 +1,11 @@
 from seat_inspection.engine import ActionRecognitionEngine
-from seat_inspection.config import KeypointProcessingConfig, RuleConfig, StateMachineConfig, WorkflowStepConfig
+from seat_inspection.config import (
+    KeypointProcessingConfig,
+    RuleConfig,
+    StateMachineConfig,
+    WorkflowStepConfig,
+    build_default_rule_actions,
+)
 from seat_inspection.pipeline import InspectionPipeline
 from seat_inspection.schemas import (
     ActionDecision,
@@ -72,7 +78,10 @@ def test_pipeline_tolerates_short_pose_gaps_without_resetting_workflow(monkeypat
         iou=0.45,
         device="cpu",
         engine=ActionRecognitionEngine(
-            rule_config=RuleConfig(touch_hold_frames=1, max_action_gap_frames=1),
+            rule_config=RuleConfig(
+                max_action_gap_frames=1,
+                actions=build_default_rule_actions(touch_hold_frames=1),
+            ),
             keypoint_processing_config=KeypointProcessingConfig(enabled=False),
             state_machine_config=StateMachineConfig(
                 steps=[
@@ -93,7 +102,6 @@ def test_pipeline_tolerates_short_pose_gaps_without_resetting_workflow(monkeypat
 
     assert first.inspection_result.current_step == "touch_side"
     assert second.decision.frame_index == 2
-    assert second.decision.touch_side_surface is False
     assert second.decision.actions["touch_side_surface"] is False
     assert second.inspection_result.current_step == "touch_side"
     assert third.inspection_result.status == "OK"
@@ -118,7 +126,10 @@ def test_pipeline_resets_after_gap_limit_is_exceeded(monkeypatch) -> None:
         iou=0.45,
         device="cpu",
         engine=ActionRecognitionEngine(
-            rule_config=RuleConfig(touch_hold_frames=2, max_action_gap_frames=1),
+            rule_config=RuleConfig(
+                max_action_gap_frames=1,
+                actions=build_default_rule_actions(touch_hold_frames=2),
+            ),
             keypoint_processing_config=KeypointProcessingConfig(enabled=False),
             state_machine_config=StateMachineConfig(
                 steps=[
@@ -139,5 +150,5 @@ def test_pipeline_resets_after_gap_limit_is_exceeded(monkeypatch) -> None:
     final_result = pipeline.finalize()
 
     assert third.inspection_result.current_step == "touch_side"
-    assert fourth.decision.touch_side_surface is False
+    assert fourth.decision.actions["touch_side_surface"] is False
     assert final_result.status == "NG"

@@ -1,4 +1,10 @@
-from seat_inspection.config import KeypointProcessingConfig, RuleConfig, StateMachineConfig, WorkflowStepConfig
+from seat_inspection.config import (
+    KeypointProcessingConfig,
+    RuleConfig,
+    StateMachineConfig,
+    WorkflowStepConfig,
+    build_default_rule_actions,
+)
 from seat_inspection.engine import ActionRecognitionEngine
 from seat_inspection.schemas import BoundingBox, FrameObservation, Point, PoseSample, SeatRegions
 
@@ -25,9 +31,11 @@ def build_observation(frame_index: int, left_wrist: Point, right_wrist: Point) -
 def test_state_machine_marks_ok_after_required_steps_complete() -> None:
     engine = ActionRecognitionEngine(
         rule_config=RuleConfig(
-            touch_hold_frames=1,
-            lift_hold_frames=1,
-            lift_ratio_threshold=0.01,
+            actions=build_default_rule_actions(
+                touch_hold_frames=1,
+                lift_hold_frames=1,
+                lift_ratio_threshold=0.01,
+            ),
         ),
         keypoint_processing_config=KeypointProcessingConfig(enabled=False),
         state_machine_config=StateMachineConfig(
@@ -56,9 +64,11 @@ def test_state_machine_marks_ok_after_required_steps_complete() -> None:
 def test_state_machine_marks_ng_when_steps_not_completed() -> None:
     engine = ActionRecognitionEngine(
         rule_config=RuleConfig(
-            touch_hold_frames=1,
-            lift_hold_frames=1,
-            lift_ratio_threshold=0.01,
+            actions=build_default_rule_actions(
+                touch_hold_frames=1,
+                lift_hold_frames=1,
+                lift_ratio_threshold=0.01,
+            ),
         ),
         keypoint_processing_config=KeypointProcessingConfig(enabled=False),
         state_machine_config=StateMachineConfig(

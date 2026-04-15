@@ -92,11 +92,13 @@ Output artifacts:
 
 ## Runtime Config
 
-`configs/runtime.example.json` contains three sections:
+`configs/runtime.example.json` can contain these sections:
 
 - `training` — YOLO training parameters
-- `rules` — action rule thresholds and hold-frame settings
+- `collection` — frame capture and auto-label dataset generation
+- `rules` — action definitions and rule thresholds
 - `inference` — video source, seat regions, and output paths
+- `multi_camera_inference` — multi-camera fusion inference settings
 - `image_inference` — single-image source, seat regions, and output paths
 
 `inference.source` can now also point to an MVS industrial camera by using a source string such as `mvs://0?timeout_ms=1000`.
@@ -107,6 +109,19 @@ Output artifacts:
 - `lift_region`
 
 For fixed industrial cameras, `seat_regions` should be calibrated from the real device view and versioned with your deployment package.
+
+## Recommended Rollout
+
+For the current project scope, training is usually not the first step.
+
+Recommended order:
+
+1. start with an existing YOLO pose checkpoint;
+2. calibrate `seat_regions`;
+3. tune `rules.actions`;
+4. tune `state_machine.steps`;
+5. validate on real production videos;
+6. only start training if the generic pose model is not stable enough on-site.
 
 ## Enterprise Implementation Notes
 
@@ -140,6 +155,9 @@ For Windows deployment and Hikrobot MVS camera bring-up, see:
 
 For a quick understanding of module responsibilities, supported capabilities, and integration flow, start with:
 
+- [docs/PROJECT_CAPABILITY_ASSESSMENT.md](docs/PROJECT_CAPABILITY_ASSESSMENT.md) — what the project can do today, which parts are mature, and whether training is actually necessary for the current scope
+- [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) — recommended rollout order for a real deployment, with rule tuning ahead of model training
+- [docs/PROJECT_STRUCTURE_AND_CONFIG_GUIDE.md](docs/PROJECT_STRUCTURE_AND_CONFIG_GUIDE.md) — recommended project structure, config organization, and naming conventions for future iterations
 - [docs/MVS_CAMERA_USAGE.md](docs/MVS_CAMERA_USAGE.md) — what `src/mvsCamera` does, how to use `mvs://` sources, and how it plugs into `seat_inspection`
 - [docs/VIDEO_INFERENCE_GUIDE.md](docs/VIDEO_INFERENCE_GUIDE.md) — how to run action-flow inference from a video file
 - [docs/runtime.video.example.json](docs/runtime.video.example.json) — ready-to-edit video inference config template

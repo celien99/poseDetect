@@ -20,6 +20,7 @@ from .config import (
     StateMachineConfig,
     TrainingConfig,
     WorkflowStepConfig,
+    build_default_rule_actions,
 )
 from .schemas import BoundingBox, SeatRegions
 
@@ -154,14 +155,40 @@ def _build_multi_camera_fusion_config(payload: dict[str, Any] | None) -> MultiCa
 
 
 def _build_rule_config(payload: dict[str, Any]) -> RuleConfig:
-    """构造动作规则配置，同时解析自定义动作列表。"""
+    """构造动作规则配置，同时兼容旧版固定动作字段。"""
     config_payload = dict(payload)
-    action_payloads = config_payload.pop("actions", [])
-    config_payload["actions"] = [
-        ActionConfig(**action_payload)
-        for action_payload in action_payloads
-    ]
+    action_payloads = config_payload.pop("actions", None)
+    legacy_action_options = _pop_legacy_rule_action_options(config_payload)
+    if action_payloads is None:
+        config_payload["actions"] = build_default_rule_actions(**legacy_action_options)
+    else:
+        config_payload["actions"] = [
+            ActionConfig(**action_payload)
+            for action_payload in action_payloads
+        ]
     return RuleConfig(**config_payload)
+
+
+def _pop_legacy_rule_action_options(payload: dict[str, Any]) -> dict[str, Any]:
+    """提取旧版固定动作字段，并转换为默认动作的构造参数。"""
+    touch_hold_frames = payload.pop("touch_hold_frames", None)
+    lift_hold_frames = payload.pop("lift_hold_frames", None)
+    touch_wrist_margin = payload.pop("wrist_to_surface_margin", None)
+    lift_wrist_margin = payload.pop("wrist_to_bottom_margin", None)
+    lift_ratio_threshold = payload.pop("lift_ratio_threshold", None)
+
+    options: dict[str, Any] = {}
+    if touch_hold_frames is not None:
+        options["touch_hold_frames"] = int(touch_hold_frames)
+    if lift_hold_frames is not None:
+        options["lift_hold_frames"] = int(lift_hold_frames)
+    if touch_wrist_margin is not None:
+        options["touch_wrist_margin"] = float(touch_wrist_margin)
+    if lift_wrist_margin is not None:
+        options["lift_wrist_margin"] = float(lift_wrist_margin)
+    if lift_ratio_threshold is not None:
+        options["lift_ratio_threshold"] = float(lift_ratio_threshold)
+    return options
 
 
 def _build_camera_inference_config(payload: dict[str, Any]) -> CameraInferenceConfig:

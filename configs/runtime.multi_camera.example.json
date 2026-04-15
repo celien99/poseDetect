@@ -1,13 +1,29 @@
 {
   "rules": {
-    "touch_hold_frames": 2,
-    "lift_hold_frames": 2,
-    "wrist_to_surface_margin": 30.0,
-    "wrist_to_bottom_margin": 40.0,
     "min_wrist_confidence": 0.3,
     "min_shoulder_confidence": 0.3,
     "min_hip_confidence": 0.3,
-    "lift_ratio_threshold": 0.1
+    "reach_ratio_threshold": 0.12,
+    "max_action_gap_frames": 2,
+    "actions": [
+      {
+        "name": "touch_side_surface",
+        "kind": "touch_region",
+        "region": "side_surface",
+        "hold_frames": 2,
+        "wrist_margin": 30.0,
+        "min_wrist_count": 1
+      },
+      {
+        "name": "lift_seat_bottom",
+        "kind": "lift_region",
+        "region": "bottom_surface",
+        "hold_frames": 2,
+        "wrist_margin": 40.0,
+        "min_wrist_count": 2,
+        "lift_ratio_threshold": 0.1
+      }
+    ]
   },
   "multi_camera_inference": {
     "pose_model_path": "yolo26n-pose.pt",

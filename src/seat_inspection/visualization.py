@@ -27,10 +27,7 @@ def annotate_frame(
 
     status_items = [f"{name}={int(state)}" for name, state in decision.actions.items()]
     if not status_items:
-        status_items = [
-            f"touch={int(decision.touch_side_surface)}",
-            f"lift={int(decision.lift_seat_bottom)}",
-        ]
+        status_items = ["no_actions"]
     status = " ".join(status_items[:3])
     cv2.putText(
         annotated,
@@ -43,12 +40,25 @@ def annotate_frame(
         cv2.LINE_AA,
     )
 
+    diagnostic_lines = _build_diagnostic_lines(decision)
+    for index, line in enumerate(diagnostic_lines[:2], start=1):
+        cv2.putText(
+            annotated,
+            line,
+            (20, 30 + index * 30),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.65,
+            (255, 255, 255),
+            2,
+            cv2.LINE_AA,
+        )
+
     if inspection_result is not None:
         summary = f"state={inspection_result.current_state} result={inspection_result.status}"
         cv2.putText(
             annotated,
             summary,
-            (20, 60),
+            (20, 120),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.7,
             (0, 200, 0) if inspection_result.status == "OK" else (0, 0, 255),
@@ -77,3 +87,25 @@ def draw_box(frame: Any, box: BoundingBox, color: tuple[int, int, int], label: s
         2,
         cv2.LINE_AA,
     )
+
+
+def _build_diagnostic_lines(decision: ActionDecision) -> list[str]:
+    lines: list[str] = []
+    for action_name in decision.actions:
+        reason = decision.reasons.get(action_name, "unknown")
+        score = decision.scores.get(action_name, 0.0)
+        if decision.actions.get(action_name, False):
+            lines.append(f"{action_name}: ok score={score:.2f}")
+            continue
+        diagnostics = decision.diagnostics.get(action_name, {})
+        if "lift_ratio" in diagnostics:
+            lines.append(
+                f"{action_name}: {reason} lift={float(diagnostics['lift_ratio']):.2f}",
+            )
+        elif "max_arm_extension_ratio" in diagnostics:
+            lines.append(
+                f"{action_name}: {reason} reach={float(diagnostics['max_arm_extension_ratio']):.2f}",
+            )
+        else:
+            lines.append(f"{action_name}: {reason}")
+    return lines

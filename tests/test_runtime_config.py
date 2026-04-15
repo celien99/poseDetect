@@ -35,7 +35,8 @@ def test_load_runtime_config_builds_nested_dataclasses(tmp_path) -> None:
 
     assert runtime.training is not None
     assert runtime.training.model_path == "model.pt"
-    assert runtime.rules.touch_hold_frames == 2
+    assert runtime.rules.actions[0].name == "touch_side_surface"
+    assert runtime.rules.actions[0].hold_frames == 2
     assert runtime.inference is not None
     assert runtime.inference.seat_regions.side_surface.x1 == 5.0
 

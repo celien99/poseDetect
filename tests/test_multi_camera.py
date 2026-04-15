@@ -10,8 +10,6 @@ def build_sample(name: str, touch: bool, lift: bool, timestamp_ms: float) -> Cam
         timestamp_ms=timestamp_ms,
         decision=ActionDecision(
             frame_index=1,
-            touch_side_surface=touch,
-            lift_seat_bottom=lift,
             actions={
                 "touch_side_surface": touch,
                 "lift_seat_bottom": lift,

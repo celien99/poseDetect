@@ -6,6 +6,14 @@ from dataclasses import dataclass, field
 
 from .schemas import SeatRegions
 
+DEFAULT_TOUCH_ACTION_NAME = "touch_side_surface"
+DEFAULT_LIFT_ACTION_NAME = "lift_seat_bottom"
+DEFAULT_TOUCH_HOLD_FRAMES = 3
+DEFAULT_LIFT_HOLD_FRAMES = 4
+DEFAULT_TOUCH_WRIST_MARGIN = 30.0
+DEFAULT_LIFT_WRIST_MARGIN = 40.0
+DEFAULT_LIFT_RATIO_THRESHOLD = 0.10
+
 
 @dataclass(slots=True)
 class ActionConfig:
@@ -19,6 +27,35 @@ class ActionConfig:
     min_wrist_count: int = 1
     lift_ratio_threshold: float | None = None
     enabled: bool = True
+
+
+def build_default_rule_actions(
+    touch_hold_frames: int = DEFAULT_TOUCH_HOLD_FRAMES,
+    lift_hold_frames: int = DEFAULT_LIFT_HOLD_FRAMES,
+    touch_wrist_margin: float = DEFAULT_TOUCH_WRIST_MARGIN,
+    lift_wrist_margin: float = DEFAULT_LIFT_WRIST_MARGIN,
+    lift_ratio_threshold: float = DEFAULT_LIFT_RATIO_THRESHOLD,
+) -> list[ActionConfig]:
+    """构建默认启用的两类基础动作。"""
+    return [
+        ActionConfig(
+            name=DEFAULT_TOUCH_ACTION_NAME,
+            kind="touch_region",
+            region="side_surface",
+            hold_frames=touch_hold_frames,
+            wrist_margin=touch_wrist_margin,
+            min_wrist_count=1,
+        ),
+        ActionConfig(
+            name=DEFAULT_LIFT_ACTION_NAME,
+            kind="lift_region",
+            region="bottom_surface",
+            hold_frames=lift_hold_frames,
+            wrist_margin=lift_wrist_margin,
+            min_wrist_count=2,
+            lift_ratio_threshold=lift_ratio_threshold,
+        ),
+    ]
 
 
 @dataclass(slots=True)
@@ -88,24 +125,17 @@ class RuleConfig:
     """动作规则配置。
 
     备注：
-    - `touch_hold_frames` 表示“触摸侧面”动作需要连续满足的帧数。
-    - `lift_hold_frames` 表示“抬起底部”动作需要连续满足的帧数。
-    - `wrist_to_surface_margin` 与 `wrist_to_bottom_margin` 用于容忍关键点抖动。
     - 各类 `min_*_confidence` 用于过滤低质量姿态点。
-    - `lift_ratio_threshold` 建议结合真实产线视频反复标定。
+    - `actions` 是唯一的动作定义入口，支持配置不同区域、连续帧要求和抬起阈值。
+    - 若未显式提供 `actions`，默认启用“触摸侧面”和“抬起底部”两种动作。
     """
 
-    touch_hold_frames: int = 3
-    lift_hold_frames: int = 4
-    wrist_to_surface_margin: float = 30.0
-    wrist_to_bottom_margin: float = 40.0
     min_wrist_confidence: float = 0.3
     min_shoulder_confidence: float = 0.3
     min_hip_confidence: float = 0.3
     reach_ratio_threshold: float = 0.12
-    lift_ratio_threshold: float = 0.10
     max_action_gap_frames: int = 2
-    actions: list[ActionConfig] = field(default_factory=list)
+    actions: list[ActionConfig] = field(default_factory=build_default_rule_actions)
 
 
 @dataclass(slots=True)
