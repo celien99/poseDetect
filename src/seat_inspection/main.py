@@ -82,6 +82,19 @@ def main() -> None:
     """CLI 主入口。"""
     parser = build_parser()
     args = parser.parse_args()
+
+    if args.command == "calibrate-regions":
+        from seat_inspection.calibration import calibrate_seat_regions
+
+        calibrate_seat_regions(
+            source=args.source,
+            output_path=args.output,
+            window_name=args.window_name,
+        )
+        if args.output:
+            print(f"Seat regions calibration saved to {args.output}")
+        return
+
     runtime_config = load_runtime_config(args.config)
 
     if args.command == "train":
@@ -103,18 +116,6 @@ def main() -> None:
             f"({summary.train_images} train / {summary.val_images} val), "
             f"dataset yaml: {summary.dataset_yaml_path}",
         )
-        return
-
-    if args.command == "calibrate-regions":
-        from seat_inspection.calibration import calibrate_seat_regions
-
-        calibrate_seat_regions(
-            source=args.source,
-            output_path=args.output,
-            window_name=args.window_name,
-        )
-        if args.output:
-            print(f"Seat regions calibration saved to {args.output}")
         return
 
     if args.command == "infer":
