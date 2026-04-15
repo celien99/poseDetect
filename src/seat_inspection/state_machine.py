@@ -63,6 +63,23 @@ class InspectionStateMachine:
             current_step=next_step_name,
         )
 
+    def snapshot(self) -> InspectionResult:
+        """返回当前流程状态快照，不消耗新的动作输入。"""
+        if not self.config.enabled:
+            return self._build_result(status="PENDING", current_state="disabled")
+
+        if not self.config.steps:
+            return self._build_result(status="PENDING", current_state="stateless")
+
+        if self._step_index >= len(self.config.steps):
+            return self._build_result(status=self.config.ok_label, current_state="completed")
+
+        return self._build_result(
+            status="PENDING",
+            current_state="in_progress",
+            current_step=self.config.steps[self._step_index].name,
+        )
+
     def finalize(self) -> InspectionResult:
         """在视频结束时输出最终流程结果。"""
         if not self.config.enabled:

@@ -183,21 +183,10 @@ def _ensure_non_empty_splits(
         return train_images, val_images
 
     if len(manifest) < 2:
-        if not manifest:
-            return train_images, val_images
-        source_split = str(manifest[0]["split"])
-        target_split = "val" if source_split == "train" else "train"
-        image_path = Path(str(manifest[0]["image"]))
-        label_path = Path(str(manifest[0]["label"]))
-        copied_image_path = dataset_root / "images" / target_split / image_path.name
-        copied_label_path = dataset_root / "labels" / target_split / label_path.name
-        shutil.copy2(image_path, copied_image_path)
-        shutil.copy2(label_path, copied_label_path)
-        if source_split == "train":
-            val_images += 1
-        else:
-            train_images += 1
-        return train_images, val_images
+        raise ValueError(
+            "At least 2 labeled samples are required to build independent train/val splits. "
+            "Capture more images or increase collection.max_images.",
+        )
 
     source_split = "train" if val_images == 0 else "val"
     target_split = "val" if val_images == 0 else "train"

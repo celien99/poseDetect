@@ -72,7 +72,7 @@ def extract_primary_person_detection(result: Any) -> PersonDetection | None:
     confidence = 1.0
     if boxes.conf is not None:
         confidences = boxes.conf.cpu().numpy()
-        selected_index = int(confidences.argmax())
+        selected_index = max(range(len(confidences)), key=lambda index: float(confidences[index]))
         confidence = float(confidences[selected_index])
 
     x1, y1, x2, y2 = xyxy[selected_index]

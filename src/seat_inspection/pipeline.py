@@ -44,6 +44,7 @@ class InspectionPipeline:
         self.confidence = confidence
         self.iou = iou
         self.device = device
+        self._missing_observation_count = 0
 
     def process_frame(
         self,
@@ -67,10 +68,21 @@ class InspectionPipeline:
         )
 
         if observation is None:
-            if not snapshot:
-                self.engine.reset_frame_context()
-            decision = self.engine.empty_decision(frame_index)
-        elif snapshot:
+            decision, inspection_result = self._handle_missing_observation(
+                frame_index=frame_index,
+                snapshot=snapshot,
+            )
+            return PipelineFrameResult(
+                frame_index=frame_index,
+                seat_regions=seat_regions,
+                person_detection=person_detection,
+                observation=None,
+                decision=decision,
+                inspection_result=inspection_result,
+            )
+
+        self._missing_observation_count = 0
+        if snapshot:
             decision = self.engine.process_snapshot(observation)
         else:
             decision = self.engine.process_frame(observation)
@@ -88,6 +100,23 @@ class InspectionPipeline:
     def finalize(self) -> InspectionResult:
         """输出整段流程的最终状态。"""
         return self.engine.finalize_state()
+
+    def _handle_missing_observation(
+        self,
+        frame_index: int,
+        snapshot: bool,
+    ) -> tuple[ActionDecision, InspectionResult]:
+        """处理无人帧或姿态解析失败的场景。"""
+        decision = self.engine.empty_decision(frame_index)
+        if snapshot:
+            return decision, self.engine.snapshot_state()
+
+        self._missing_observation_count += 1
+        if self._missing_observation_count <= self.engine.max_action_gap_frames:
+            return decision, self.engine.snapshot_state()
+
+        self.engine.reset_frame_context()
+        return decision, self.engine.update_state(decision)
 
     def _detect_person(self, frame: Any, pose_result: Any) -> PersonDetection | None:
         """优先走独立人体检测，否则回退到姿态结果的人体框。"""

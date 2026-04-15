@@ -54,9 +54,18 @@ class ActionRecognitionEngine:
         """生成空判定，供无人帧或解析失败时使用。"""
         return self.evaluator.empty_decision(frame_index)
 
+    @property
+    def max_action_gap_frames(self) -> int:
+        """返回动作识别允许的最大连续漏检帧数。"""
+        return max(0, self.evaluator.config.max_action_gap_frames)
+
     def update_state(self, decision: ActionDecision) -> InspectionResult:
         """用当前帧动作结果推进流程状态机。"""
         return self.state_machine.update(decision)
+
+    def snapshot_state(self) -> InspectionResult:
+        """返回当前流程状态快照，不推进状态机。"""
+        return self.state_machine.snapshot()
 
     def finalize_state(self) -> InspectionResult:
         """在流结束时生成最终流程结果。"""
