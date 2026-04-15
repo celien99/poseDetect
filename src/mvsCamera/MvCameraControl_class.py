@@ -1,4 +1,9 @@
 # -- coding: utf-8 --
+"""ctypes 版 MVS SDK Python 包装层。
+
+该文件主要负责把海康官方 DLL 暴露成 Python 可调用接口。
+这里保留了与 SDK 原生函数名接近的形式，便于对照官方示例和文档排障。
+"""
 
 import copy
 import ctypes
@@ -28,6 +33,8 @@ else:
 
 
 class _MissingSdkProxy:
+    """当 SDK 未成功加载时，延迟在首次调用 DLL 符号时给出明确报错。"""
+
     def __init__(self, error: Exception) -> None:
         self._error = error
 
@@ -42,6 +49,7 @@ class _MissingSdkProxy:
 
 
 def _load_sdk_library():
+    """优先尝试项目本地 DLL，其次回退到系统安装的 MVS 环境。"""
     sdk_path = Path(__file__).with_name("MvCameraControl.dll")
     try:
         return load_mvs_sdk_library(sdk_path)
@@ -50,10 +58,12 @@ def _load_sdk_library():
 
 
 def _encode_ascii(value):
+    """SDK 节点名通常要求 ASCII 编码。"""
     return value.encode("ascii")
 
 
 def _encode_path(value):
+    """把路径参数转换为当前系统可接受的字节串。"""
     return os.fsencode(str(value))
 
 
@@ -80,10 +90,15 @@ _MV_FRAME_OUT_._fields_ = [
 MV_FRAME_OUT = _MV_FRAME_OUT_
 
 class MvCamera():
+    """海康相机对象的 Python 封装。
+
+    绝大多数方法都是对 DLL 原生接口的薄包装，命名与官方 SDK 保持一致，
+    这样在 Windows 测试机上遇到问题时，能够直接对照海康文档与官方 Demo。
+    """
 
     def __init__(self):
-        self._handle = c_void_p()  # 记录当前连接设备的句柄
-        self.handle = pointer(self._handle)  # 创建句柄指针
+        self._handle = c_void_p()  # 当前连接设备句柄
+        self.handle = pointer(self._handle)  # 传给 DLL 的句柄指针
 
     # 枚举设备
     @staticmethod

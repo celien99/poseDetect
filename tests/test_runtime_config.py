@@ -88,3 +88,83 @@ def test_load_runtime_config_builds_collection_config(tmp_path) -> None:
     assert runtime.collection.pose_model_path == "model.pt"
     assert runtime.collection.source == "mvs://0?timeout_ms=1000"
     assert runtime.collection.max_images == 20
+
+
+def test_load_runtime_config_builds_configurable_actions_and_image_inference(tmp_path) -> None:
+    config_path = tmp_path / "runtime.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "rules": {
+                    "actions": [
+                        {
+                            "name": "touch_bottom_surface",
+                            "kind": "touch_region",
+                            "region": "bottom_surface",
+                            "hold_frames": 1
+                        }
+                    ]
+                },
+                "image_inference": {
+                    "pose_model_path": "model.pt",
+                    "source": "demo.jpg",
+                    "seat_regions": {
+                        "overall": {"x1": 1, "y1": 2, "x2": 3, "y2": 4},
+                        "side_surface": {"x1": 5, "y1": 6, "x2": 7, "y2": 8},
+                        "bottom_surface": {"x1": 9, "y1": 10, "x2": 11, "y2": 12}
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    runtime = load_runtime_config(str(config_path))
+
+    assert runtime.rules.actions[0].name == "touch_bottom_surface"
+    assert runtime.image_inference is not None
+    assert runtime.image_inference.source == "demo.jpg"
+
+
+def test_load_runtime_config_builds_keypoint_processing_and_state_machine(tmp_path) -> None:
+    config_path = tmp_path / "runtime.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "inference": {
+                    "pose_model_path": "model.pt",
+                    "source": "demo.mp4",
+                    "keypoint_processing": {
+                        "enabled": True,
+                        "smoothing_window": 5,
+                        "interpolate_missing": True,
+                        "max_missing_frames": 3,
+                        "min_confidence": 0.2
+                    },
+                    "state_machine": {
+                        "enabled": True,
+                        "require_all_steps": True,
+                        "steps": [
+                            {
+                                "name": "step1",
+                                "action": "touch_side_surface",
+                                "min_frames": 2
+                            }
+                        ]
+                    },
+                    "seat_regions": {
+                        "overall": {"x1": 1, "y1": 2, "x2": 3, "y2": 4},
+                        "side_surface": {"x1": 5, "y1": 6, "x2": 7, "y2": 8},
+                        "bottom_surface": {"x1": 9, "y1": 10, "x2": 11, "y2": 12}
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    runtime = load_runtime_config(str(config_path))
+
+    assert runtime.inference is not None
+    assert runtime.inference.keypoint_processing.smoothing_window == 5
+    assert runtime.inference.state_machine.steps[0].name == "step1"

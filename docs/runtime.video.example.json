@@ -1,0 +1,90 @@
+{
+  "rules": {
+    "touch_hold_frames": 2,
+    "lift_hold_frames": 2,
+    "wrist_to_surface_margin": 30.0,
+    "wrist_to_bottom_margin": 40.0,
+    "min_wrist_confidence": 0.3,
+    "min_shoulder_confidence": 0.3,
+    "min_hip_confidence": 0.3,
+    "reach_ratio_threshold": 0.12,
+    "lift_ratio_threshold": 0.1,
+    "max_action_gap_frames": 2,
+    "actions": [
+      {
+        "name": "touch_side_surface",
+        "kind": "touch_region",
+        "region": "side_surface",
+        "hold_frames": 2,
+        "wrist_margin": 30.0,
+        "min_wrist_count": 1
+      },
+      {
+        "name": "lift_seat_bottom",
+        "kind": "lift_region",
+        "region": "bottom_surface",
+        "hold_frames": 2,
+        "wrist_margin": 40.0,
+        "min_wrist_count": 2,
+        "lift_ratio_threshold": 0.1
+      }
+    ]
+  },
+  "inference": {
+    "pose_model_path": "yolo26n-pose.pt",
+    "person_model_path": null,
+    "seat_model_path": null,
+    "source": "data/demo.mp4",
+    "output_json_path": "outputs/action_results.json",
+    "output_video_path": "outputs/action_preview.mp4",
+    "confidence": 0.25,
+    "iou": 0.45,
+    "device": "cpu",
+    "save_visualization": true,
+    "keypoint_processing": {
+      "enabled": true,
+      "smoothing_window": 3,
+      "interpolate_missing": true,
+      "max_missing_frames": 2,
+      "min_confidence": 0.15
+    },
+    "state_machine": {
+      "enabled": true,
+      "require_all_steps": true,
+      "ok_label": "OK",
+      "ng_label": "NG",
+      "steps": [
+        {
+          "name": "touch_side",
+          "action": "touch_side_surface",
+          "min_frames": 2
+        },
+        {
+          "name": "lift_bottom",
+          "action": "lift_seat_bottom",
+          "min_frames": 2
+        }
+      ]
+    },
+    "seat_regions": {
+      "overall": {
+        "x1": 100,
+        "y1": 100,
+        "x2": 300,
+        "y2": 320
+      },
+      "side_surface": {
+        "x1": 280,
+        "y1": 130,
+        "x2": 330,
+        "y2": 260
+      },
+      "bottom_surface": {
+        "x1": 140,
+        "y1": 220,
+        "x2": 260,
+        "y2": 330
+      }
+    }
+  }
+}

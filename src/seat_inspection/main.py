@@ -6,6 +6,7 @@ from seat_inspection.runtime_config import load_runtime_config
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """构建项目统一 CLI，覆盖训练、采集、视频推理和图片推理。"""
     parser = argparse.ArgumentParser(
         description="Enterprise seat inspection training and inference entry",
     )
@@ -34,11 +35,22 @@ def build_parser() -> argparse.ArgumentParser:
         default="configs/runtime.example.json",
         help="Runtime config JSON path",
     )
+
+    infer_image_parser = subparsers.add_parser(
+        "infer-image",
+        help="Run single-image inference and export JSON",
+    )
+    infer_image_parser.add_argument(
+        "--config",
+        default="configs/runtime.example.json",
+        help="Runtime config JSON path",
+    )
     return parser
 
 
 
 def main() -> None:
+    """CLI 主入口。"""
     parser = build_parser()
     args = parser.parse_args()
     runtime_config = load_runtime_config(args.config)
@@ -73,6 +85,18 @@ def main() -> None:
         print(
             f"Inference completed: {len(decisions)} frames processed, "
             f"report saved to {runtime_config.inference.output_json_path}",
+        )
+        return
+
+    if args.command == "infer-image":
+        from seat_inspection.inference import run_image_inference
+
+        if runtime_config.image_inference is None:
+            raise ValueError("Image inference config is missing in runtime config file")
+        decision = run_image_inference(runtime_config.image_inference, runtime_config.rules)
+        print(
+            f"Image inference completed: actions={decision.actions}, "
+            f"report saved to {runtime_config.image_inference.output_json_path}",
         )
         return
 

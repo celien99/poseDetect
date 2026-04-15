@@ -1,3 +1,5 @@
+"""兼容早期训练脚本的轻量 CLI。"""
+
 from __future__ import annotations
 
 import argparse
@@ -7,6 +9,7 @@ from .training import train_pose_model
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """构建仅包含训练能力的简化命令行入口。"""
     parser = argparse.ArgumentParser(description="Seat inspection pose training CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -23,6 +26,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main() -> None:
+    """简化 CLI 主入口。"""
     parser = build_parser()
     args = parser.parse_args()
 

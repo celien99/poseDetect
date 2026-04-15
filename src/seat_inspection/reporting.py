@@ -1,3 +1,5 @@
+"""动作识别结果导出工具。"""
+
 from __future__ import annotations
 
 import json
@@ -5,18 +7,34 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from .schemas import ActionDecision
+from .schemas import ActionDecision, InspectionResult
 
 
 def export_action_report(
     output_path: str,
     decisions: list[ActionDecision],
     metadata: dict[str, Any],
+    inspection_result: InspectionResult | None = None,
 ) -> None:
+    """把动作结果导出为 JSON，供联调、回溯和系统集成使用。"""
+    action_names: list[str] = []
+    for decision in decisions:
+        for action_name in decision.actions:
+            if action_name not in action_names:
+                action_names.append(action_name)
+
     report = {
         "metadata": metadata,
         "summary": {
             "frame_count": len(decisions),
+            "action_frames": {
+                action_name: [
+                    decision.frame_index
+                    for decision in decisions
+                    if decision.actions.get(action_name, False)
+                ]
+                for action_name in action_names
+            },
             "touch_side_surface_frames": [
                 decision.frame_index
                 for decision in decisions
@@ -27,8 +45,12 @@ def export_action_report(
                 for decision in decisions
                 if decision.lift_seat_bottom
             ],
+            "final_status": inspection_result.status if inspection_result is not None else None,
+            "current_state": inspection_result.current_state if inspection_result is not None else None,
+            "completed_steps": inspection_result.completed_steps if inspection_result is not None else [],
         },
         "decisions": [asdict(decision) for decision in decisions],
+        "inspection_result": asdict(inspection_result) if inspection_result is not None else None,
     }
 
     report_path = Path(output_path)

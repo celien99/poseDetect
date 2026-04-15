@@ -1,4 +1,4 @@
-from seat_inspection.config import RuleConfig
+from seat_inspection.config import ActionConfig, RuleConfig
 from seat_inspection.engine import ActionRecognitionEngine
 from seat_inspection.schemas import BoundingBox, FrameObservation, Point, PoseSample, SeatRegions
 
@@ -48,3 +48,53 @@ def test_lift_bottom_requires_both_wrists_near_bottom() -> None:
 
     assert not first.lift_seat_bottom
     assert second.lift_seat_bottom
+
+
+def test_custom_touch_action_can_be_configured_from_rules() -> None:
+    engine = ActionRecognitionEngine(
+        RuleConfig(
+            actions=[
+                ActionConfig(
+                    name="touch_bottom_surface",
+                    kind="touch_region",
+                    region="bottom_surface",
+                    hold_frames=1,
+                    wrist_margin=5.0,
+                    min_wrist_count=1,
+                ),
+            ],
+        ),
+    )
+
+    decision = engine.process_frame(
+        build_observation(1, Point(170, 230, 0.95), Point(260, 180, 0.95)),
+    )
+
+    assert decision.actions["touch_bottom_surface"]
+    assert not decision.touch_side_surface
+    assert not decision.lift_seat_bottom
+
+
+def test_snapshot_mode_returns_current_action_without_hold_history() -> None:
+    engine = ActionRecognitionEngine(
+        RuleConfig(
+            touch_hold_frames=3,
+            actions=[
+                ActionConfig(
+                    name="touch_side_surface",
+                    kind="touch_region",
+                    region="side_surface",
+                    hold_frames=3,
+                    wrist_margin=5.0,
+                    min_wrist_count=1,
+                ),
+            ],
+        ),
+    )
+
+    decision = engine.process_snapshot(
+        build_observation(1, Point(285, 180, 0.95), Point(240, 210, 0.95)),
+    )
+
+    assert decision.actions["touch_side_surface"]
+    assert decision.touch_side_surface

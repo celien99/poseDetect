@@ -14,24 +14,28 @@ else:
     from .pixel_utils import is_color_pixel_type, is_mono_pixel_type
 
 MVS_SOURCE_SCHEME = "mvs"
-DEFAULT_GRAB_TIMEOUT_MS = 1000
+DEFAULT_GRAB_TIMEOUT_MS = 1000  # 单帧主动取流超时时间，单位毫秒
 
 
 class MvsCameraError(RuntimeError):
-    """MVS SDK camera access error."""
+    """MVS SDK 相机访问异常。"""
 
 
 @dataclass
 class MvsCameraSourceConfig:
+    """工业相机源配置。"""
+
     device_index: int = 0
     grab_timeout_ms: int = DEFAULT_GRAB_TIMEOUT_MS
 
 
 def is_mvs_source(source: str) -> bool:
+    """判断给定源是否为 `mvs://` 工业相机地址。"""
     return source.lower().startswith(f"{MVS_SOURCE_SCHEME}://")
 
 
 def parse_mvs_source(source: str) -> MvsCameraSourceConfig:
+    """解析 `mvs://` 源字符串为结构化配置。"""
     if not is_mvs_source(source):
         raise ValueError(f"Unsupported MVS source: {source}")
 
@@ -46,19 +50,20 @@ def parse_mvs_source(source: str) -> MvsCameraSourceConfig:
 
 
 def open_mvs_capture(source: str) -> "MvsCameraCapture":
+    """根据字符串源创建工业相机取流对象。"""
     return MvsCameraCapture(parse_mvs_source(source))
 
 
 class MvsCameraCapture:
-    """A cv2.VideoCapture-like wrapper around the Hikrobot MVS SDK."""
+    """对海康 MVS SDK 的轻量封装，接口尽量兼容 `cv2.VideoCapture`。"""
 
     def __init__(self, config: MvsCameraSourceConfig) -> None:
         self._config = config
         self._sdk = _load_sdk()
         self._camera = self._sdk["MvCamera"]()
         self._device_list = self._sdk["MV_CC_DEVICE_INFO_LIST"]()
-        self._frame_buffer: Any | None = None
-        self._payload_size = 0
+        self._frame_buffer: Any | None = None  # SDK 原始帧缓存
+        self._payload_size = 0  # 当前设备单帧最大字节数
         self._width = 0
         self._height = 0
         self._fps = 0.0
@@ -66,9 +71,11 @@ class MvsCameraCapture:
         self._start()
 
     def isOpened(self) -> bool:
+        """返回当前相机是否成功打开。"""
         return self._opened
 
     def read(self) -> tuple[bool, Any]:
+        """读取一帧图像，返回值风格与 OpenCV 保持一致。"""
         if not self._opened:
             return False, None
 
@@ -88,6 +95,7 @@ class MvsCameraCapture:
         return True, self._decode_frame(self._frame_buffer, frame_info)
 
     def release(self) -> None:
+        """停止取流并释放设备句柄。"""
         if not self._opened:
             return
 
@@ -101,6 +109,7 @@ class MvsCameraCapture:
                 self._opened = False
 
     def get(self, prop_id: int) -> float:
+        """兼容 OpenCV 的少量属性查询。"""
         if prop_id == 3:
             return float(self._width)
         if prop_id == 4:
@@ -110,6 +119,7 @@ class MvsCameraCapture:
         return 0.0
 
     def _start(self) -> None:
+        """枚举设备、打开目标相机并开始取流。"""
         transport_layer = self._sdk["MV_GIGE_DEVICE"] | self._sdk["MV_USB_DEVICE"]
         ret = self._sdk["MvCamera"].MV_CC_EnumDevices(transport_layer, self._device_list)
         _check_ret(ret, "enumerate devices")
@@ -134,6 +144,7 @@ class MvsCameraCapture:
             _check_ret(ret, "open device")
 
             if device_info.nTLayerType == self._sdk["MV_GIGE_DEVICE"]:
+                # GigE 相机需要优先设置最佳包长，避免丢包或吞吐下降。
                 packet_size = self._camera.MV_CC_GetOptimalPacketSize()
                 if int(packet_size) > 0:
                     self._camera.MV_CC_SetIntValue("GevSCPSPacketSize", int(packet_size))
@@ -157,6 +168,7 @@ class MvsCameraCapture:
         self._opened = True
 
     def _get_int_value(self, node_name: str) -> int:
+        """读取整型节点值。"""
         param = self._sdk["MVCC_INTVALUE"]()
         memset(byref(param), 0, sizeof(param))
         ret = self._camera.MV_CC_GetIntValue(node_name, param)
@@ -164,6 +176,7 @@ class MvsCameraCapture:
         return int(param.nCurValue)
 
     def _get_float_value(self, node_name: str) -> float:
+        """读取浮点型节点值，若节点不可读则返回 0。"""
         param = self._sdk["MVCC_FLOATVALUE"]()
         memset(byref(param), 0, sizeof(param))
         ret = self._camera.MV_CC_GetFloatValue(node_name, param)
@@ -172,6 +185,7 @@ class MvsCameraCapture:
         return float(param.fCurValue)
 
     def _decode_frame(self, frame_buffer: Any, frame_info: Any) -> Any:
+        """把 SDK 原始帧转换成 OpenCV 可直接使用的 BGR 图像。"""
         cv2, np = _load_runtime_dependencies()
         width = int(frame_info.nWidth)
         height = int(frame_info.nHeight)
@@ -202,6 +216,7 @@ class MvsCameraCapture:
             return cv2.cvtColor(mono, cv2.COLOR_GRAY2BGR)
 
         if is_color_pixel_type(pixel_type):
+            # 统一转换到 BGR，便于直接喂给 OpenCV / YOLO。
             converted = self._convert_pixel_type(
                 frame_buffer,
                 frame_info,
@@ -215,6 +230,7 @@ class MvsCameraCapture:
             ).reshape(height, width, 3).copy()
 
         if is_mono_pixel_type(pixel_type):
+            # 单通道图像也转换成 3 通道 BGR，避免上游推理逻辑分支处理。
             converted = self._convert_pixel_type(
                 frame_buffer,
                 frame_info,
@@ -237,6 +253,7 @@ class MvsCameraCapture:
         destination_pixel_type: int,
         destination_size: int,
     ) -> Any:
+        """调用 SDK 内置像素格式转换能力。"""
         convert_param = self._sdk["MV_CC_PIXEL_CONVERT_PARAM"]()
         memset(byref(convert_param), 0, sizeof(convert_param))
         convert_param.nWidth = frame_info.nWidth
@@ -256,6 +273,7 @@ class MvsCameraCapture:
 
 
 def _parse_device_index(parsed: Any) -> int:
+    """从 `mvs://<index>` 或 `mvs://index/<index>` 中解析设备号。"""
     candidate = parsed.netloc or parsed.path.strip("/")
     if not candidate:
         return 0
@@ -265,11 +283,13 @@ def _parse_device_index(parsed: Any) -> int:
 
 
 def _check_ret(ret: int, action: str) -> None:
+    """统一检查 SDK 返回码。"""
     if ret != 0:
         raise MvsCameraError(f"Failed to {action}: 0x{ret:x}")
 
 
 def _load_sdk() -> dict[str, Any]:
+    """延迟导入 MVS SDK 相关结构体与常量，降低普通环境启动成本。"""
     from .CameraParams_const import MV_ACCESS_Exclusive, MV_GIGE_DEVICE, MV_TRIGGER_MODE_OFF, MV_USB_DEVICE
     from .MvCameraControl_class import MvCamera
     from .MvCameraControl_header import (
@@ -303,6 +323,7 @@ def _load_sdk() -> dict[str, Any]:
 
 
 def _load_runtime_dependencies() -> tuple[Any, Any]:
+    """延迟导入 OpenCV / numpy，避免无相机环境下不必要的导入失败。"""
     try:
         import cv2
         import numpy as np

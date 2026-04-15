@@ -1,3 +1,11 @@
+"""MVS SDK 最小演示脚本。
+
+主要用途：
+- 在 Windows 测试机上验证 MVS 软件与 SDK 是否可正常调用
+- 快速枚举设备、打开相机并显示实时图像
+- 作为后续业务封装排障时的最小可运行基线
+"""
+
 import sys
 from pathlib import Path
 import numpy as np
@@ -47,6 +55,7 @@ def enum_devices(device = 0 , device_way = False):
  
 # 判断不同类型设备
 def identify_different_devices(deviceList):
+    """遍历设备列表并打印不同总线类型下的设备信息。"""
     # 判断不同类型设备，并输出相关信息
     for i in range(0, deviceList.nDeviceNum):
         mvcc_dev_info = cast(deviceList.pDeviceInfo[i], POINTER(MV_CC_DEVICE_INFO)).contents
@@ -93,6 +102,7 @@ def identify_different_devices(deviceList):
  
 # 输入需要连接的相机的序号
 def input_num_camera(deviceList):
+    """读取用户输入的设备序号。"""
     nConnectionNum = input("please input the number of the device to connect:")
     if int(nConnectionNum) >= deviceList.nDeviceNum:
         print("intput error!")
@@ -133,6 +143,7 @@ def creat_camera(deviceList , nConnectionNum ,log = True , log_path = getcwd()):
  
 # 打开设备
 def open_device(cam):
+    """打开已创建句柄的相机设备。"""
     # ch:打开设备 | en:Open device
     ret = cam.MV_CC_OpenDevice(MV_ACCESS_Exclusive, 0)
     if ret != 0:
@@ -250,6 +261,7 @@ def set_Value(cam , param_type = "int_value" , node_name = "PayloadSize" , node_
  
 # 判断相机是否处于连接状态(返回值如何获取)=================================
 def decide_divice_on_line(cam):
+    """输出当前设备在线状态。"""
     value = cam.MV_CC_IsDeviceConnected()
     if value == True:
         print("该设备在线 ！")
@@ -258,6 +270,7 @@ def decide_divice_on_line(cam):
  
 # 设置 SDK 内部图像缓存节点个数
 def set_image_Node_num(cam , Num = 1):
+    """设置 SDK 内部缓存节点数量。"""
     ret = cam.MV_CC_SetImageNodeNum(nNum = Num)
     if ret != 0:
         print("设置 SDK 内部图像缓存节点个数失败 ,报错码 ret[0x%x]" % ret)
@@ -293,6 +306,7 @@ def set_grab_strategy(cam , grabstrategy = 0 , outputqueuesize = 1):
  
 # 显示图像
 def image_show(image , name):
+    """统一用 OpenCV 显示图像。"""
     image = cv2.resize(image, (600, 400), interpolation=cv2.INTER_AREA)
     name = str(name)
     cv2.imshow(name, image)
@@ -300,6 +314,7 @@ def image_show(image , name):
  
 # 需要显示的图像数据转换
 def image_control(data , stFrameInfo):
+    """按像素格式把原始数据转换为可显示图像。"""
     if stFrameInfo.enPixelType == PixelType_Gvsp_Mono8:
         image = data.reshape((stFrameInfo.nHeight, stFrameInfo.nWidth))
         image_show(image=image , name = stFrameInfo.nHeight)
@@ -366,6 +381,7 @@ stFrameInfo = POINTER(MV_FRAME_OUT_INFO_EX)
 pData = POINTER(c_ubyte)
 FrameInfoCallBack = winfun_ctype(None, pData, stFrameInfo, c_void_p)
 def image_callback(pData, pFrameInfo, pUser):
+    """SDK 回调取流时的图像处理函数。"""
     global img_buff
     img_buff = None
     stFrameInfo = cast(pFrameInfo, POINTER(MV_FRAME_OUT_INFO_EX)).contents
@@ -381,6 +397,7 @@ CALL_BACK_FUN = FrameInfoCallBack(image_callback)
  
 # 注册回调取图
 def call_back_get_image(cam):
+    """注册取图回调函数。"""
     # ch:注册抓图回调 | en:Register image callback
     ret = cam.MV_CC_RegisterImageCallBackEx(CALL_BACK_FUN, None)
     if ret != 0:
@@ -389,6 +406,7 @@ def call_back_get_image(cam):
  
 # 关闭设备与销毁句柄
 def close_and_destroy_device(cam , data_buf=None):
+    """停止取流、关闭设备并销毁句柄。"""
     # 停止取流
     ret = cam.MV_CC_StopGrabbing()
     if ret != 0:
@@ -413,12 +431,14 @@ def close_and_destroy_device(cam , data_buf=None):
  
 # 开启取流并获取数据包大小
 def start_grab_and_get_data_size(cam):
+    """开启取流。"""
     ret = cam.MV_CC_StartGrabbing()
     if ret != 0:
         print("开始取流失败! ret[0x%x]" % ret)
         sys.exit()
  
 def main():
+    """按交互方式跑通设备枚举、打开和取流显示流程。"""
     # 枚举设备
     deviceList = enum_devices(device=0, device_way=False)
     # 判断不同类型设备

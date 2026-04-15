@@ -76,6 +76,12 @@ python -m seat_inspection train --config configs/runtime.example.json
 python -m seat_inspection infer --config configs/runtime.example.json
 ```
 
+执行单张图片判断：
+
+```bash
+python -m seat_inspection infer-image --config configs/runtime.example.json
+```
+
 ### 2）为什么推荐这种方式
 
 这样做的好处是：
@@ -114,6 +120,11 @@ python -m seat_inspection infer --config configs/runtime.example.json
 - `wrist_to_bottom_margin`：手腕接近底部的容忍距离
 - `lift_ratio_threshold`：抬起动作判定阈值
 
+另外也支持 `rules.actions` 配置动作列表，当前内置两种动作类型：
+
+- `touch_region`
+- `lift_region`
+
 ### `inference`
 
 用于推理运行，例如：
@@ -124,6 +135,16 @@ python -m seat_inspection infer --config configs/runtime.example.json
 - `output_json_path`：动作识别结果 JSON 输出路径
 - `output_video_path`：可视化视频输出路径
 - `save_visualization`：是否导出标注视频
+
+### `image_inference`
+
+用于单张图片动作判断，例如：
+
+- `source`：图片路径
+- `pose_model_path`：姿态模型路径
+- `seat_regions`：区域标定
+- `output_json_path`：单图动作结果输出
+- `output_image_path`：单图可视化输出
 
 其中如果接入 `src/mvsCamera` 适配后的工业相机，可使用类似下面的配置：
 
@@ -234,6 +255,12 @@ python -m seat_inspection collect --config configs/runtime.example.json
 
 ```bash
 python -m seat_inspection infer --config configs/runtime.example.json
+```
+
+单图判断：
+
+```bash
+python -m seat_inspection infer-image --config configs/runtime.example.json
 ```
 
 查看帮助：

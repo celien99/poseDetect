@@ -1,4 +1,12 @@
 # -- coding: utf-8 --
+"""保留的官方 Demo 风格相机操作封装。
+
+该模块更偏向桌面联调演示：
+- 支持打开设备、开始取流、显示窗口
+- 仍保留官方 SDK 包装层的调用方式
+- 目前主要用于 Windows 现场排障，不建议直接作为业务层长期 API
+"""
+
 import ctypes
 import inspect
 import sys
@@ -20,6 +28,7 @@ else:
     from .pixel_utils import is_color_pixel_type, is_mono_pixel_type
  
 def Async_raise(tid, exctype):
+    """向指定线程注入异常，用于强制停止取流线程。"""
     tid = ctypes.c_long(tid)
     if not inspect.isclass(exctype):
         exctype = type(exctype)
@@ -31,27 +40,30 @@ def Async_raise(tid, exctype):
         raise SystemError("PyThreadState_SetAsyncExc failed")
  
 def Stop_thread(thread):
+    """停止指定线程。"""
     Async_raise(thread.ident, SystemExit)
  
 class CameraOperation():
+    """面向 Demo 界面的相机操作封装。"""
  
     def __init__(self,obj_cam,st_device_list,n_connect_num=0,b_open_device=False,b_start_grabbing = False,h_thread_handle=None,\
                 b_thread_closed=False,st_frame_info=None,b_exit=False,frame_rate=0,exposure_time=0,gain=0):
  
-        self.obj_cam = obj_cam
-        self.st_device_list = st_device_list
-        self.n_connect_num = n_connect_num
+        self.obj_cam = obj_cam  # 当前操作的相机实例
+        self.st_device_list = st_device_list  # 设备枚举结果
+        self.n_connect_num = n_connect_num  # 选中的设备索引
         self.b_open_device = b_open_device
         self.b_start_grabbing = b_start_grabbing 
         self.b_thread_closed = b_thread_closed
-        self.st_frame_info = st_frame_info
+        self.st_frame_info = st_frame_info  # 最近一帧的元信息
         self.b_exit = b_exit
-        self.h_thread_handle = h_thread_handle
+        self.h_thread_handle = h_thread_handle  # 取流显示线程
         self.frame_rate = frame_rate
         self.exposure_time = exposure_time
         self.gain = gain
  
     def To_hex_str(self,num):
+        """把 SDK 返回码转换成十六进制字符串，便于对照文档。"""
         chaDic = {10: 'a', 11: 'b', 12: 'c', 13: 'd', 14: 'e', 15: 'f'}
         hexStr = ""
         if num < 0:
@@ -64,6 +76,7 @@ class CameraOperation():
         return hexStr
  
     def Open_device(self):
+        """按当前选中的设备索引打开相机。"""
         if False == self.b_open_device:
             # ch:选择设备并创建句柄 | en:Select device and create handle
             nConnectionNum = int(self.n_connect_num)
@@ -105,6 +118,7 @@ class CameraOperation():
             return 0
  
     def Start_grabbing(self):
+        """开始取流并拉起显示线程。"""
         if False == self.b_start_grabbing and True == self.b_open_device:
             self.b_exit = False
             ret = self.obj_cam.MV_CC_StartGrabbing()
@@ -122,6 +136,7 @@ class CameraOperation():
                 False == self.b_start_grabbing
  
     def Stop_grabbing(self):
+        """停止取流并结束显示线程。"""
         if True == self.b_start_grabbing and self.b_open_device == True:
             #退出线程
             if True == self.b_thread_closed:
@@ -136,6 +151,7 @@ class CameraOperation():
             self.b_exit  = True      
  
     def Close_device(self):
+        """关闭设备并释放句柄。"""
         if True == self.b_open_device:
             #退出线程
             if True == self.b_thread_closed:
@@ -154,6 +170,7 @@ class CameraOperation():
         print ("close device successfully!")
  
     def Set_trigger_mode(self,strMode):
+        """设置连续模式或软触发模式。"""
         if True == self.b_open_device:
             if "continuous" == strMode: 
                 ret = self.obj_cam.MV_CC_SetEnumValue("TriggerMode",0)
@@ -168,6 +185,7 @@ class CameraOperation():
                     tkinter.messagebox.showerror('show error','set triggersource fail! ret = '+self.To_hex_str(ret))
  
     def Trigger_once(self,nCommand):
+        """在软触发模式下触发一次采图。"""
         if True == self.b_open_device:
             if 1 == nCommand: 
                 ret = self.obj_cam.MV_CC_SetCommandValue("TriggerSoftware")
@@ -175,6 +193,7 @@ class CameraOperation():
                     tkinter.messagebox.showerror('show error','set triggersoftware fail! ret = '+self.To_hex_str(ret))
  
     def Get_parameter(self):
+        """读取当前帧率、曝光和增益参数。"""
         if True == self.b_open_device:
             stFloatParam_FrameRate =  MVCC_FLOATVALUE()
             memset(byref(stFloatParam_FrameRate), 0, sizeof(MVCC_FLOATVALUE))
@@ -197,6 +216,7 @@ class CameraOperation():
             tkinter.messagebox.showinfo('show info','get parameter success!')
  
     def Set_parameter(self,frameRate,exposureTime,gain):
+        """设置帧率、曝光和增益参数。"""
         if '' == frameRate or '' == exposureTime or '' == gain:
             tkinter.messagebox.showinfo('show info','please type in the text box !')
             return
@@ -216,6 +236,7 @@ class CameraOperation():
             tkinter.messagebox.showinfo('show info','set parameter success!')
  
     def Work_thread(self):
+        """持续从 SDK 取帧、做像素格式转换并通过 OpenCV 显示。"""
         stOutFrame = MV_FRAME_OUT()  
         img_buff = None
         buf_cache = None
@@ -299,6 +320,7 @@ class CameraOperation():
                 break
  
     def Mono_numpy(self,data,nWidth,nHeight):
+        """把 Mono 原始缓存转换成 numpy 图像。"""
         data_ = np.frombuffer(data, count=int(nWidth * nHeight), dtype=np.uint8, offset=0)
         data_mono_arr = data_.reshape(nHeight, nWidth)
         numArray = np.zeros([nHeight, nWidth, 1],"uint8")
@@ -306,6 +328,7 @@ class CameraOperation():
         return numArray
  
     def Color_numpy(self,data,nWidth,nHeight):
+        """把 RGB 原始缓存拆分为 numpy 三通道图像。"""
         data_ = np.frombuffer(data, count=int(nWidth*nHeight*3), dtype=np.uint8, offset=0)
         data_r = data_[0:nWidth*nHeight*3:3]
         data_g = data_[1:nWidth*nHeight*3:3]

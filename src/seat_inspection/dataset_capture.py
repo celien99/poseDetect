@@ -7,9 +7,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import cv2
+from media_inputs import open_frame_stream
 
 from .config import CollectionConfig
-from .video_source import open_capture
 
 COCO_PERSON_KEYPOINT_SHAPE = [17, 3]
 COCO_PERSON_FLIP_IDX = [0, 2, 1, 4, 3, 6, 5, 8, 7, 10, 9, 12, 11, 14, 13, 16, 15]
@@ -17,6 +17,8 @@ COCO_PERSON_FLIP_IDX = [0, 2, 1, 4, 3, 6, 5, 8, 7, 10, 9, 12, 11, 14, 13, 16, 15
 
 @dataclass(slots=True)
 class DatasetCaptureSummary:
+    """数据采集完成后的摘要统计。"""
+
     saved_images: int
     train_images: int
     val_images: int
@@ -26,6 +28,7 @@ class DatasetCaptureSummary:
 
 
 def capture_pose_dataset(config: CollectionConfig) -> DatasetCaptureSummary:
+    """从视频或 MVS 相机采集图像并自动生成 YOLO pose 数据集。"""
     from ultralytics import YOLO
 
     _validate_collection_config(config)
@@ -34,30 +37,30 @@ def capture_pose_dataset(config: CollectionConfig) -> DatasetCaptureSummary:
     _prepare_output_dir(dataset_root, overwrite=config.overwrite)
 
     model = YOLO(config.pose_model_path)
-    capture = open_capture(config.source)
-    if not capture.isOpened():
+    stream = open_frame_stream(config.source)
+    if not stream.is_opened():
         raise ValueError(f"Unable to open collection source: {config.source}")
 
-    rng = random.Random(config.random_seed)
+    rng = random.Random(config.random_seed)  # 固定随机种子，便于复现 train/val 划分
     frame_index = 0
     saved_images = 0
     skipped_frames = 0
     train_images = 0
     val_images = 0
-    manifest: list[dict[str, object]] = []
+    manifest: list[dict[str, object]] = []  # 记录每张图像来源，方便追溯问题样本
 
     try:
         while saved_images < config.max_images:
-            success, frame = capture.read()
-            if not success:
+            media_frame = stream.read_frame()
+            if media_frame is None:
                 break
 
-            frame_index += 1
+            frame_index = media_frame.frame_index
             if frame_index % config.save_every_n_frames != 0:
                 continue
 
             result = model.predict(
-                frame,
+                media_frame.image,
                 conf=config.confidence,
                 iou=config.iou,
                 device=config.device,
@@ -73,7 +76,7 @@ def capture_pose_dataset(config: CollectionConfig) -> DatasetCaptureSummary:
             image_path = dataset_root / "images" / split / f"{image_stem}.jpg"
             label_path = dataset_root / "labels" / split / f"{image_stem}.txt"
 
-            cv2.imwrite(str(image_path), frame)
+            cv2.imwrite(str(image_path), media_frame.image)
             if label_path.exists():
                 label_path.unlink()
             result.save_txt(label_path, save_conf=False)
@@ -98,7 +101,7 @@ def capture_pose_dataset(config: CollectionConfig) -> DatasetCaptureSummary:
                 }
             )
     finally:
-        capture.release()
+        stream.release()
 
     if saved_images == 0:
         raise ValueError("No labeled pose samples were captured; dataset was not created")
@@ -118,6 +121,7 @@ def capture_pose_dataset(config: CollectionConfig) -> DatasetCaptureSummary:
 
 
 def _validate_collection_config(config: CollectionConfig) -> None:
+    """校验采集参数是否合法。"""
     if config.save_every_n_frames <= 0:
         raise ValueError("save_every_n_frames must be greater than 0")
     if config.max_images <= 0:
@@ -127,6 +131,7 @@ def _validate_collection_config(config: CollectionConfig) -> None:
 
 
 def _prepare_output_dir(dataset_root: Path, overwrite: bool) -> None:
+    """准备输出目录结构，必要时清空旧数据集。"""
     if dataset_root.exists() and any(dataset_root.iterdir()):
         if not overwrite:
             raise ValueError(
@@ -141,6 +146,7 @@ def _prepare_output_dir(dataset_root: Path, overwrite: bool) -> None:
 
 
 def _has_pose_instances(result) -> bool:
+    """判断当前帧是否成功检测到可保存的人体姿态。"""
     keypoints = getattr(result, "keypoints", None)
     boxes = getattr(result, "boxes", None)
     return bool(
@@ -158,6 +164,7 @@ def _choose_split(
     train_images: int,
     val_images: int,
 ) -> str:
+    """按目标比例选择 train/val，并尽量保证两个集合都非空。"""
     if train_images == 0:
         return "train"
     if val_images == 0 and train_images >= 4:
@@ -171,6 +178,7 @@ def _ensure_non_empty_splits(
     val_images: int,
     manifest: list[dict[str, object]],
 ) -> tuple[int, int]:
+    """在极小样本场景下兜底，确保 train/val 至少各有一张图。"""
     if train_images > 0 and val_images > 0:
         return train_images, val_images
 
@@ -216,6 +224,7 @@ def _ensure_non_empty_splits(
 
 
 def _write_dataset_yaml(dataset_root: Path, dataset_yaml_path: Path) -> None:
+    """生成 Ultralytics 训练所需的数据集 YAML 文件。"""
     dataset_yaml_path.parent.mkdir(parents=True, exist_ok=True)
     dataset_yaml_path.write_text(
         "\n".join(
@@ -240,6 +249,7 @@ def _write_manifest(
     config: CollectionConfig,
     manifest: list[dict[str, object]],
 ) -> None:
+    """保存采集清单，记录源配置和每个样本的来源帧。"""
     manifest_path.write_text(
         json.dumps(
             {

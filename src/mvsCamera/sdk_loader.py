@@ -16,11 +16,11 @@ ENV_HINTS = (
 
 
 class MvsSdkLoadError(RuntimeError):
-    """Raised when the Hikrobot MVS SDK DLL cannot be loaded."""
+    """海康 MVS SDK DLL 无法加载时抛出的异常。"""
 
 
 def load_mvs_sdk_library(local_dll_path: Path | None = None):
-    """Load the Hikrobot MVS control DLL from the project or an installed SDK."""
+    """从项目目录或系统已安装的 MVS 环境中加载控制 DLL。"""
     if os.name != "nt":
         raise MvsSdkLoadError("MVS SDK loading is only supported on Windows")
 
@@ -42,11 +42,12 @@ def load_mvs_sdk_library(local_dll_path: Path | None = None):
 
 
 def describe_mvs_sdk_candidates(local_dll_path: Path | None = None) -> list[str]:
-    """Return the DLL candidates that would be tried for loading the MVS SDK."""
+    """返回当前会尝试加载的 DLL 候选路径，便于 Windows 现场排障。"""
     return [str(path) for path in _iter_candidate_dlls(local_dll_path)]
 
 
 def _iter_candidate_dlls(local_dll_path: Path | None) -> list[Path]:
+    """汇总所有可能的 DLL 位置，并去重。"""
     candidates: list[Path] = []
     seen: set[str] = set()
 
@@ -69,6 +70,7 @@ def _iter_candidate_dlls(local_dll_path: Path | None) -> list[Path]:
 
 
 def _candidate_sdk_roots(local_dll_path: Path | None) -> list[Path]:
+    """收集可能的 SDK 根目录。"""
     roots: list[Path] = []
     seen: set[str] = set()
 
@@ -89,6 +91,7 @@ def _candidate_sdk_roots(local_dll_path: Path | None) -> list[Path]:
         add_root(local_dll_path.parent)
 
     for env_name in ENV_HINTS:
+        # 兼容不同机器上常见的环境变量命名。
         env_value = os.environ.get(env_name)
         if env_value:
             add_root(Path(env_value))
@@ -107,6 +110,7 @@ def _candidate_sdk_roots(local_dll_path: Path | None) -> list[Path]:
 
 
 def _iter_common_install_locations() -> list[Path]:
+    """枚举常见的 MVS 默认安装目录。"""
     program_files = [
         os.environ.get("ProgramFiles"),
         os.environ.get("ProgramFiles(x86)"),
@@ -126,6 +130,7 @@ def _iter_common_install_locations() -> list[Path]:
 
 
 def _iter_registry_install_locations() -> list[Path]:
+    """从 Windows 注册表中尝试发现 MVS 安装目录。"""
     if os.name != "nt":
         return []
 
@@ -182,6 +187,7 @@ def _iter_registry_install_locations() -> list[Path]:
 
 
 def _find_dlls_under_root(root: Path) -> list[Path]:
+    """在候选根目录下优先按常见目录结构查找 DLL，必要时再递归搜索。"""
     if not root.exists():
         return []
 
@@ -203,6 +209,7 @@ def _find_dlls_under_root(root: Path) -> list[Path]:
 
 
 def _register_dependency_dirs(dll_path: Path) -> None:
+    """为 Python 3.8+ 注册 DLL 依赖目录，避免仅主 DLL 存在仍加载失败。"""
     add_dll_directory = getattr(os, "add_dll_directory", None)
     if add_dll_directory is None:
         return
@@ -215,6 +222,7 @@ def _register_dependency_dirs(dll_path: Path) -> None:
 
 
 def _dependency_directories(dll_path: Path) -> list[Path]:
+    """推断与主 DLL 同时需要加入搜索路径的运行时目录。"""
     directories: list[Path] = []
     seen: set[str] = set()
 
@@ -250,6 +258,7 @@ def _dependency_directories(dll_path: Path) -> list[Path]:
 
 
 def _infer_sdk_root(dll_path: Path) -> Path:
+    """根据 DLL 所在位置反推 SDK 根目录。"""
     current = dll_path.parent
     markers = {"runtime", "development", "bin", "applications", "win64", "win32"}
     while current.parent != current:
@@ -260,4 +269,5 @@ def _infer_sdk_root(dll_path: Path) -> Path:
 
 
 def _platform_dir_name() -> str:
+    """根据 Python 位数选择 Win32/Win64 目录名。"""
     return "Win64" if sys.maxsize > 2**32 else "Win32"

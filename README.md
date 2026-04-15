@@ -79,6 +79,12 @@ Run video inference and export JSON results:
 python -m seat_inspection infer --config configs/runtime.example.json
 ```
 
+Run single-image inference:
+
+```bash
+python -m seat_inspection infer-image --config configs/runtime.example.json
+```
+
 Output artifacts:
 
 - `outputs/action_results.json` — frame-by-frame action decisions
@@ -91,8 +97,14 @@ Output artifacts:
 - `training` — YOLO training parameters
 - `rules` — action rule thresholds and hold-frame settings
 - `inference` — video source, seat regions, and output paths
+- `image_inference` — single-image source, seat regions, and output paths
 
 `inference.source` can now also point to an MVS industrial camera by using a source string such as `mvs://0?timeout_ms=1000`.
+
+`rules.actions` can define custom actions without changing Python code. The built-in action kinds are:
+
+- `touch_region`
+- `lift_region`
 
 For fixed industrial cameras, `seat_regions` should be calibrated from the real device view and versioned with your deployment package.
 
