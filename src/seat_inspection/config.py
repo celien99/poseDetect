@@ -53,6 +53,16 @@ class StateMachineConfig:
 
 
 @dataclass(slots=True)
+class MultiCameraFusionConfig:
+    """多相机动作融合配置。"""
+
+    default_action_strategy: str = "any"
+    touch_action_strategy: str = "any"
+    lift_action_strategy: str = "any"
+    time_tolerance_ms: float = 120.0
+
+
+@dataclass(slots=True)
 class TrainingConfig:
     """训练配置。
 
@@ -124,6 +134,48 @@ class InferenceConfig:
     iou: float = 0.45
     device: str = "cpu"
     save_visualization: bool = False
+    show_window: bool = False
+    window_name: str = "seat-inspection"
+    window_wait_ms: int = 1
+    exit_key: str = "q"
+    keypoint_processing: KeypointProcessingConfig = field(default_factory=KeypointProcessingConfig)
+    state_machine: StateMachineConfig = field(default_factory=StateMachineConfig)
+
+
+@dataclass(slots=True)
+class CameraInferenceConfig:
+    """多相机模式下的单路相机配置。"""
+
+    name: str
+    source: str
+    seat_regions: SeatRegions
+    pose_model_path: str | None = None
+    person_model_path: str | None = None
+    seat_model_path: str | None = None
+    confidence: float | None = None
+    iou: float | None = None
+    device: str | None = None
+
+
+@dataclass(slots=True)
+class MultiCameraInferenceConfig:
+    """多相机推理配置。"""
+
+    pose_model_path: str
+    cameras: list[CameraInferenceConfig]
+    output_json_path: str = "outputs/multi_camera_action_results.json"
+    output_video_path: str | None = None
+    person_model_path: str | None = None
+    seat_model_path: str | None = None
+    confidence: float = 0.25
+    iou: float = 0.45
+    device: str = "cpu"
+    save_visualization: bool = False
+    show_window: bool = False
+    window_name: str = "seat-inspection-multi"
+    window_wait_ms: int = 1
+    exit_key: str = "q"
+    fusion: MultiCameraFusionConfig = field(default_factory=MultiCameraFusionConfig)
     keypoint_processing: KeypointProcessingConfig = field(default_factory=KeypointProcessingConfig)
     state_machine: StateMachineConfig = field(default_factory=StateMachineConfig)
 

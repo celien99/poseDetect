@@ -76,10 +76,22 @@ python -m seat_inspection train --config configs/runtime.example.json
 python -m seat_inspection infer --config configs/runtime.example.json
 ```
 
+执行多相机推理：
+
+```bash
+python -m seat_inspection infer-multi --config configs/runtime.multi_camera.example.json
+```
+
 执行单张图片判断：
 
 ```bash
 python -m seat_inspection infer-image --config configs/runtime.example.json
+```
+
+交互式标定座椅区域：
+
+```bash
+python -m seat_inspection calibrate-regions --source "mvs://0?timeout_ms=1000" --output configs/seat_regions.front.json
 ```
 
 ### 2）为什么推荐这种方式
@@ -135,6 +147,17 @@ python -m seat_inspection infer-image --config configs/runtime.example.json
 - `output_json_path`：动作识别结果 JSON 输出路径
 - `output_video_path`：可视化视频输出路径
 - `save_visualization`：是否导出标注视频
+- `show_window`：是否用 OpenCV 窗口实时显示检测结果
+- `exit_key`：实时窗口退出按键
+
+### `multi_camera_inference`
+
+用于多相机融合推理，例如：
+
+- `cameras`：多路相机列表，每路单独配置 `name`、`source`、`seat_regions`
+- `fusion`：跨相机动作融合策略，例如 `any`、`all`、`majority`
+- `show_window`：是否显示多相机拼接实时窗口
+- `output_json_path`：融合后的动作识别结果
 
 ### `image_inference`
 
@@ -205,7 +228,25 @@ python -m seat_inspection infer --config configs/runtime.example.json
 - `outputs/action_results.json`
 - `outputs/action_preview.mp4`（当 `save_visualization=true` 时）
 
-## 九、企业落地建议
+如果 `show_window=true`，会打开 OpenCV 窗口实时显示当前识别结果，按 `q` 退出。
+
+## 九、区域标定说明
+
+固定机位场景建议先做 ROI 标定，再开始调动作规则。当前已支持交互式标定：
+
+```bash
+python -m seat_inspection calibrate-regions --source "mvs://0?timeout_ms=1000"
+```
+
+命令会读取一帧画面，并依次让你框选：
+
+- `overall`
+- `side_surface`
+- `bottom_surface`
+
+完成后会输出一段 JSON，可直接粘贴到 `inference.seat_regions` 或 `multi_camera_inference.cameras[i].seat_regions`。
+
+## 十、企业落地建议
 
 如果你要把这个项目真正用于产线，建议继续补充以下能力：
 
@@ -217,7 +258,7 @@ python -m seat_inspection infer --config configs/runtime.example.json
 - 与 MES / QMS / 设备系统对接；
 - 模型版本管理与灰度发布机制。
 
-## 十、测试
+## 十一、测试
 
 如果当前环境已安装 `pytest`，可执行：
 
@@ -231,13 +272,13 @@ pytest
 python3 -m compileall src tests
 ```
 
-## 十一、Windows 测试机部署说明
+## 十二、Windows 测试机部署说明
 
 如果你要把项目放到 Windows 测试机，并连接海康工业相机，请优先阅读：
 
 - [WINDOWS_TEST_GUIDE.md](WINDOWS_TEST_GUIDE.md)
 
-## 十二、文档索引
+## 十三、文档索引
 
 如果你要快速了解当前项目各模块的职责、能力边界和接入方式，建议按下面顺序阅读：
 
@@ -245,7 +286,7 @@ python3 -m compileall src tests
 - [docs/VIDEO_INFERENCE_GUIDE.md](docs/VIDEO_INFERENCE_GUIDE.md)：如何提供一份视频并输出动作流程检测结果
 - [docs/runtime.video.example.json](docs/runtime.video.example.json)：视频推理配置模板，可直接复制修改
 
-## 十三、当前推荐命令汇总
+## 十四、当前推荐命令汇总
 
 训练：
 

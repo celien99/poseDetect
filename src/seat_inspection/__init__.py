@@ -2,10 +2,13 @@
 
 from .config import (
     ActionConfig,
+    CameraInferenceConfig,
     CollectionConfig,
     ImageInferenceConfig,
     InferenceConfig,
     KeypointProcessingConfig,
+    MultiCameraFusionConfig,
+    MultiCameraInferenceConfig,
     RuleConfig,
     StateMachineConfig,
     TrainingConfig,
@@ -19,11 +22,14 @@ from .runtime_config import RuntimeConfigBundle, load_runtime_config
 __all__ = [
     "ActionRecognitionEngine",
     "ActionConfig",
+    "CameraInferenceConfig",
     "CollectionConfig",
     "ImageInferenceConfig",
     "InferenceConfig",
     "InspectionPipeline",
     "KeypointProcessingConfig",
+    "MultiCameraFusionConfig",
+    "MultiCameraInferenceConfig",
     "PoseEstimator",
     "RuleConfig",
     "RuntimeConfigBundle",

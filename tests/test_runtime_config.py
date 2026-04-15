@@ -168,3 +168,51 @@ def test_load_runtime_config_builds_keypoint_processing_and_state_machine(tmp_pa
     assert runtime.inference is not None
     assert runtime.inference.keypoint_processing.smoothing_window == 5
     assert runtime.inference.state_machine.steps[0].name == "step1"
+
+
+def test_load_runtime_config_builds_multi_camera_inference(tmp_path) -> None:
+    config_path = tmp_path / "runtime.json"
+    config_path.write_text(
+        json.dumps(
+            {
+                "multi_camera_inference": {
+                    "pose_model_path": "pose.pt",
+                    "show_window": True,
+                    "fusion": {
+                        "touch_action_strategy": "any",
+                        "lift_action_strategy": "majority",
+                        "time_tolerance_ms": 80.0
+                    },
+                    "cameras": [
+                        {
+                            "name": "front",
+                            "source": "mvs://0?timeout_ms=1000",
+                            "seat_regions": {
+                                "overall": {"x1": 1, "y1": 2, "x2": 3, "y2": 4},
+                                "side_surface": {"x1": 5, "y1": 6, "x2": 7, "y2": 8},
+                                "bottom_surface": {"x1": 9, "y1": 10, "x2": 11, "y2": 12}
+                            }
+                        },
+                        {
+                            "name": "side",
+                            "source": "mvs://1?timeout_ms=1000",
+                            "seat_regions": {
+                                "overall": {"x1": 10, "y1": 20, "x2": 30, "y2": 40},
+                                "side_surface": {"x1": 50, "y1": 60, "x2": 70, "y2": 80},
+                                "bottom_surface": {"x1": 90, "y1": 100, "x2": 110, "y2": 120}
+                            }
+                        }
+                    ]
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    runtime = load_runtime_config(str(config_path))
+
+    assert runtime.multi_camera_inference is not None
+    assert runtime.multi_camera_inference.show_window is True
+    assert runtime.multi_camera_inference.fusion.lift_action_strategy == "majority"
+    assert runtime.multi_camera_inference.cameras[0].source == "mvs://0?timeout_ms=1000"
+    assert runtime.multi_camera_inference.cameras[1].seat_regions.bottom_surface.x2 == 110.0

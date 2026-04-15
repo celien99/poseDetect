@@ -29,10 +29,39 @@ def build_parser() -> argparse.ArgumentParser:
         help="Runtime config JSON path",
     )
 
+    calibrate_parser = subparsers.add_parser(
+        "calibrate-regions",
+        help="Interactively calibrate seat regions from one image/video/camera source",
+    )
+    calibrate_parser.add_argument(
+        "--source",
+        required=True,
+        help="Calibration source: image path, video path, camera index, or mvs:// source",
+    )
+    calibrate_parser.add_argument(
+        "--output",
+        help="Optional JSON output path. Prints JSON to stdout when omitted.",
+    )
+    calibrate_parser.add_argument(
+        "--window-name",
+        default="seat-region-calibration",
+        help="OpenCV calibration window name",
+    )
+
     infer_parser = subparsers.add_parser("infer", help="Run video inference and export JSON")
     infer_parser.add_argument(
         "--config",
         default="configs/runtime.example.json",
+        help="Runtime config JSON path",
+    )
+
+    infer_multi_parser = subparsers.add_parser(
+        "infer-multi",
+        help="Run multi-camera inference and export fused JSON",
+    )
+    infer_multi_parser.add_argument(
+        "--config",
+        default="configs/runtime.multi_camera.example.json",
         help="Runtime config JSON path",
     )
 
@@ -76,6 +105,18 @@ def main() -> None:
         )
         return
 
+    if args.command == "calibrate-regions":
+        from seat_inspection.calibration import calibrate_seat_regions
+
+        calibrate_seat_regions(
+            source=args.source,
+            output_path=args.output,
+            window_name=args.window_name,
+        )
+        if args.output:
+            print(f"Seat regions calibration saved to {args.output}")
+        return
+
     if args.command == "infer":
         from seat_inspection.inference import run_video_inference
 
@@ -85,6 +126,21 @@ def main() -> None:
         print(
             f"Inference completed: {len(decisions)} frames processed, "
             f"report saved to {runtime_config.inference.output_json_path}",
+        )
+        return
+
+    if args.command == "infer-multi":
+        from seat_inspection.inference import run_multi_camera_inference
+
+        if runtime_config.multi_camera_inference is None:
+            raise ValueError("Multi-camera inference config is missing in runtime config file")
+        decisions = run_multi_camera_inference(
+            runtime_config.multi_camera_inference,
+            runtime_config.rules,
+        )
+        print(
+            f"Multi-camera inference completed: {len(decisions)} fused frames processed, "
+            f"report saved to {runtime_config.multi_camera_inference.output_json_path}",
         )
         return
 

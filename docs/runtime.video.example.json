@@ -41,6 +41,10 @@
     "iou": 0.45,
     "device": "cpu",
     "save_visualization": true,
+    "show_window": true,
+    "window_name": "seat-inspection",
+    "window_wait_ms": 1,
+    "exit_key": "q",
     "keypoint_processing": {
       "enabled": true,
       "smoothing_window": 3,

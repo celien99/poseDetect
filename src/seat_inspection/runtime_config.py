@@ -9,10 +9,13 @@ from typing import Any
 
 from .config import (
     ActionConfig,
+    CameraInferenceConfig,
     CollectionConfig,
     ImageInferenceConfig,
     InferenceConfig,
     KeypointProcessingConfig,
+    MultiCameraFusionConfig,
+    MultiCameraInferenceConfig,
     RuleConfig,
     StateMachineConfig,
     TrainingConfig,
@@ -27,6 +30,7 @@ class RuntimeConfigBundle:
 
     training: TrainingConfig | None = None
     inference: InferenceConfig | None = None
+    multi_camera_inference: MultiCameraInferenceConfig | None = None
     image_inference: ImageInferenceConfig | None = None
     collection: CollectionConfig | None = None
     rules: RuleConfig = field(default_factory=RuleConfig)
@@ -37,6 +41,7 @@ def load_runtime_config(path: str) -> RuntimeConfigBundle:
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
     training_payload = payload.get("training")
     inference_payload = payload.get("inference")
+    multi_camera_inference_payload = payload.get("multi_camera_inference")
     image_inference_payload = payload.get("image_inference")
     collection_payload = payload.get("collection")
     rules_payload = payload.get("rules", {})
@@ -44,6 +49,7 @@ def load_runtime_config(path: str) -> RuntimeConfigBundle:
     return RuntimeConfigBundle(
         training=_build_training_config(training_payload),
         inference=_build_inference_config(inference_payload),
+        multi_camera_inference=_build_multi_camera_inference_config(multi_camera_inference_payload),
         image_inference=_build_image_inference_config(image_inference_payload),
         collection=_build_collection_config(collection_payload),
         rules=_build_rule_config(rules_payload),
@@ -89,6 +95,30 @@ def _build_image_inference_config(payload: dict[str, Any] | None) -> ImageInfere
     return ImageInferenceConfig(**config_payload)
 
 
+def _build_multi_camera_inference_config(
+    payload: dict[str, Any] | None,
+) -> MultiCameraInferenceConfig | None:
+    """构造多相机推理配置。"""
+    if payload is None:
+        return None
+
+    config_payload = dict(payload)
+    config_payload["cameras"] = [
+        _build_camera_inference_config(camera_payload)
+        for camera_payload in config_payload.get("cameras", [])
+    ]
+    config_payload["fusion"] = _build_multi_camera_fusion_config(
+        config_payload.get("fusion"),
+    )
+    config_payload["keypoint_processing"] = _build_keypoint_processing_config(
+        config_payload.get("keypoint_processing"),
+    )
+    config_payload["state_machine"] = _build_state_machine_config(
+        config_payload.get("state_machine"),
+    )
+    return MultiCameraInferenceConfig(**config_payload)
+
+
 def _build_collection_config(payload: dict[str, Any] | None) -> CollectionConfig | None:
     """构造数据采集配置。"""
     if payload is None:
@@ -116,6 +146,13 @@ def _build_state_machine_config(payload: dict[str, Any] | None) -> StateMachineC
     return StateMachineConfig(**config_payload)
 
 
+def _build_multi_camera_fusion_config(payload: dict[str, Any] | None) -> MultiCameraFusionConfig:
+    """构造多相机融合配置。"""
+    if payload is None:
+        return MultiCameraFusionConfig()
+    return MultiCameraFusionConfig(**payload)
+
+
 def _build_rule_config(payload: dict[str, Any]) -> RuleConfig:
     """构造动作规则配置，同时解析自定义动作列表。"""
     config_payload = dict(payload)
@@ -125,6 +162,13 @@ def _build_rule_config(payload: dict[str, Any]) -> RuleConfig:
         for action_payload in action_payloads
     ]
     return RuleConfig(**config_payload)
+
+
+def _build_camera_inference_config(payload: dict[str, Any]) -> CameraInferenceConfig:
+    """构造多相机模式下的单路相机配置。"""
+    config_payload = dict(payload)
+    config_payload["seat_regions"] = _build_seat_regions(config_payload["seat_regions"])
+    return CameraInferenceConfig(**config_payload)
 
 
 def _build_seat_regions(payload: dict[str, Any]) -> SeatRegions:
