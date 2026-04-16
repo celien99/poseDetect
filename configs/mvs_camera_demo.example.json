@@ -1,0 +1,22 @@
+{
+  "mvs_camera_demo": {
+    "camera_name": "cam_0",
+    "preview": true,
+    "show_nodes": true,
+    "output_dir": "outputs/mvs_camera_demo",
+    "save_prefix": "capture",
+    "window_name": "mvs-camera-demo"
+  },
+  "multi_camera_inference": {
+    "cameras": [
+      {
+        "name": "cam_0",
+        "source": "mvs://sn/DA9184658?timeout_ms=1000&trigger=continuous&pixel_format=bgr8&exposure_auto=off&exposure_time=5000&gain_auto=off&gain=6&frame_rate_enable=true&fps=10"
+      },
+      {
+        "name": "cam_1",
+        "source": "mvs://sn/DA9184675?timeout_ms=1000&trigger=continuous&pixel_format=bgr8&exposure_auto=off&exposure_time=5000&gain_auto=off&gain=6&frame_rate_enable=true&fps=10"
+      }
+    ]
+  }
+}
