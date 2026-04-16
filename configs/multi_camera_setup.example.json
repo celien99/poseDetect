@@ -1,0 +1,14 @@
+{
+  "multi_camera_setup": {
+    "cameras": [
+      {
+        "name": "front",
+        "source": "mvs://0?timeout_ms=1000"
+      },
+      {
+        "name": "side",
+        "source": "mvs://1?timeout_ms=1000"
+      }
+    ]
+  }
+}
