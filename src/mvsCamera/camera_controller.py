@@ -38,6 +38,16 @@ PIXEL_FORMAT_MAP = {
     "bgr8": PixelType_Gvsp_BGR8_Packed,
     "rgb8": PixelType_Gvsp_RGB8_Packed,
 }
+EXPOSURE_AUTO_MODE_MAP = {
+    "off": 0,
+    "once": 1,
+    "continuous": 2,
+}
+GAIN_AUTO_MODE_MAP = {
+    "off": 0,
+    "once": 1,
+    "continuous": 2,
+}
 TRIGGER_SOURCE_SOFTWARE = 7
 _ERROR_NAME_BY_CODE = {
     value: name
@@ -73,6 +83,25 @@ class CameraLocator:
     mac_address: str | None = None
 
 
+@dataclass(slots=True)
+class CameraPropertyConfig:
+    """相机运行时属性配置。"""
+
+    exposure_auto: str | None = None
+    exposure_time_us: float | None = None
+    gain_auto: str | None = None
+    gain: float | None = None
+    gamma: float | None = None
+    acquisition_frame_rate_enable: bool | None = None
+    acquisition_frame_rate: float | None = None
+    width: int | None = None
+    height: int | None = None
+    offset_x: int | None = None
+    offset_y: int | None = None
+    reverse_x: bool | None = None
+    reverse_y: bool | None = None
+
+
 class HikCamera:
     """参考 Windows 已验证代码整理出的单相机控制器。"""
 
@@ -84,10 +113,12 @@ class HikCamera:
         locator: CameraLocator | None = None,
         trigger_mode: str = "continuous",
         pixel_format: str = "bgr8",
+        property_config: CameraPropertyConfig | None = None,
     ) -> None:
         self.locator = locator or CameraLocator()
         self.trigger_mode = trigger_mode
         self.pixel_format = pixel_format
+        self.property_config = property_config or CameraPropertyConfig()
         self.cam = MvCamera()
         self.device_list = MV_CC_DEVICE_INFO_LIST()
         self.frame_info = MV_FRAME_OUT_INFO_EX()
@@ -164,6 +195,7 @@ class HikCamera:
 
             self.set_trigger_mode(self.trigger_mode == "software")
             self._try_set_pixel_format(self.pixel_format)
+            self.apply_property_config()
 
             self.width = self._get_int_value("Width")
             self.height = self._get_int_value("Height")
@@ -210,6 +242,99 @@ class HikCamera:
         ret = self.cam.MV_CC_SetCommandValue("TriggerSoftware")
         if ret != 0:
             raise MvsCameraError(f"TriggerSoftware failed: {parse_error(ret)}")
+
+    def apply_property_config(self) -> None:
+        """应用额外的相机属性配置。"""
+        config = self.property_config
+
+        if config.reverse_x is not None:
+            self._set_bool_value("ReverseX", config.reverse_x)
+        if config.reverse_y is not None:
+            self._set_bool_value("ReverseY", config.reverse_y)
+        if config.exposure_auto is not None:
+            self.set_exposure_auto(config.exposure_auto)
+        if config.exposure_time_us is not None:
+            self.set_exposure_time(config.exposure_time_us)
+        if config.gain_auto is not None:
+            self.set_gain_auto(config.gain_auto)
+        if config.gain is not None:
+            self.set_gain(config.gain)
+        if config.gamma is not None:
+            self.set_gamma(config.gamma)
+        if config.acquisition_frame_rate_enable is not None:
+            self._set_bool_value("AcquisitionFrameRateEnable", config.acquisition_frame_rate_enable)
+        if config.acquisition_frame_rate is not None:
+            self.set_acquisition_frame_rate(config.acquisition_frame_rate)
+        self._apply_roi_config(config)
+
+    def set_exposure_auto(self, mode: str) -> None:
+        """设置曝光自动模式。"""
+        self._set_mapped_enum_value("ExposureAuto", mode, EXPOSURE_AUTO_MODE_MAP)
+
+    def set_exposure_time(self, exposure_time_us: float) -> None:
+        """设置曝光时间，单位微秒。"""
+        self._set_float_value("ExposureTime", exposure_time_us)
+
+    def set_gain_auto(self, mode: str) -> None:
+        """设置增益自动模式。"""
+        self._set_mapped_enum_value("GainAuto", mode, GAIN_AUTO_MODE_MAP)
+
+    def set_gain(self, gain: float) -> None:
+        """设置模拟增益。"""
+        self._set_float_value("Gain", gain)
+
+    def set_gamma(self, gamma: float) -> None:
+        """设置 Gamma。"""
+        self._set_float_value("Gamma", gamma)
+
+    def set_acquisition_frame_rate(self, fps: float) -> None:
+        """设置采集帧率。"""
+        self._set_float_value("AcquisitionFrameRate", fps)
+
+    def set_roi(
+        self,
+        *,
+        width: int | None = None,
+        height: int | None = None,
+        offset_x: int | None = None,
+        offset_y: int | None = None,
+    ) -> None:
+        """设置 ROI 参数。"""
+        if width is not None:
+            self._set_int_value("Width", width)
+        if height is not None:
+            self._set_int_value("Height", height)
+        if offset_x is not None:
+            self._set_int_value("OffsetX", offset_x)
+        if offset_y is not None:
+            self._set_int_value("OffsetY", offset_y)
+
+    def get_int_node(self, node_name: str) -> dict[str, int]:
+        """读取整数节点的当前值与范围。"""
+        value = MVCC_INTVALUE()
+        memset(byref(value), 0, sizeof(value))
+        ret = self.cam.MV_CC_GetIntValue(node_name, value)
+        if ret != 0:
+            raise MvsCameraError(f"Read int node '{node_name}' failed: {parse_error(ret)}")
+        return {
+            "current": int(value.nCurValue),
+            "min": int(value.nMin),
+            "max": int(value.nMax),
+            "inc": int(value.nInc),
+        }
+
+    def get_float_node(self, node_name: str) -> dict[str, float]:
+        """读取浮点节点的当前值与范围。"""
+        value = MVCC_FLOATVALUE()
+        memset(byref(value), 0, sizeof(value))
+        ret = self.cam.MV_CC_GetFloatValue(node_name, value)
+        if ret != 0:
+            raise MvsCameraError(f"Read float node '{node_name}' failed: {parse_error(ret)}")
+        return {
+            "current": float(value.fCurValue),
+            "min": float(value.fMin),
+            "max": float(value.fMax),
+        }
 
     def get_frame(self, timeout_ms: int = 1000) -> np.ndarray | None:
         """读取一帧图像，统一返回 BGR。"""
@@ -322,6 +447,46 @@ class HikCamera:
         if ret != 0:
             return 0.0
         return float(value.fCurValue)
+
+    def _set_int_value(self, node_name: str, value: int) -> None:
+        ret = self.cam.MV_CC_SetIntValue(node_name, int(value))
+        if ret != 0:
+            raise MvsCameraError(f"Set int node '{node_name}' failed: {parse_error(ret)}")
+
+    def _set_float_value(self, node_name: str, value: float) -> None:
+        ret = self.cam.MV_CC_SetFloatValue(node_name, float(value))
+        if ret != 0:
+            raise MvsCameraError(f"Set float node '{node_name}' failed: {parse_error(ret)}")
+
+    def _set_bool_value(self, node_name: str, value: bool) -> None:
+        ret = self.cam.MV_CC_SetBoolValue(node_name, bool(value))
+        if ret != 0:
+            raise MvsCameraError(f"Set bool node '{node_name}' failed: {parse_error(ret)}")
+
+    def _set_mapped_enum_value(self, node_name: str, value: str, mapping: dict[str, int]) -> None:
+        normalized = value.strip().lower()
+        enum_value = mapping.get(normalized)
+        if enum_value is None:
+            options = ", ".join(sorted(mapping))
+            raise MvsCameraError(f"Unsupported value '{value}' for '{node_name}', expected one of: {options}")
+        ret = self.cam.MV_CC_SetEnumValue(node_name, enum_value)
+        if ret != 0:
+            raise MvsCameraError(f"Set enum node '{node_name}' failed: {parse_error(ret)}")
+
+    def _apply_roi_config(self, config: CameraPropertyConfig) -> None:
+        if (
+            config.width is None
+            and config.height is None
+            and config.offset_x is None
+            and config.offset_y is None
+        ):
+            return
+        self.set_roi(
+            width=config.width,
+            height=config.height,
+            offset_x=config.offset_x,
+            offset_y=config.offset_y,
+        )
 
     def _try_set_pixel_format(self, pixel_format: str) -> None:
         pixel_type = PIXEL_FORMAT_MAP.get(pixel_format.lower())

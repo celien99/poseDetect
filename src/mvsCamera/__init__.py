@@ -18,11 +18,12 @@ from .frame_source import (
     open_mvs_capture,
     parse_mvs_source,
 )
-from .camera_controller import CameraLocator, HikCamera, MvsDeviceInfo
+from .camera_controller import CameraLocator, CameraPropertyConfig, HikCamera, MvsDeviceInfo
 from .sdk.sdk_loader import MvsSdkLoadError, describe_mvs_sdk_candidates
 
 __all__ = [
     "CameraLocator",
+    "CameraPropertyConfig",
     "HikCamera",
     "MvsCameraCapture",
     "MvsCameraError",

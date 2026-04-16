@@ -57,6 +57,7 @@
 - `src/seat_inspection/reporting.py`：JSON 报告导出
 - `src/media_inputs/`：统一输入流抽象
 - `src/mvsCamera/`：海康 MVS 接入层
+- `MVS_CAMERA_GUIDE_ZH.md`：`src/mvsCamera/` 新手入门与参数配置详解
 - `configs/multi_camera_setup.example.json`：搭建拍照配置示例
 - `configs/runtime.multi_camera.example.json`：通用推理配置
 - `configs/runtime.multi_camera.mvs.json`：多路 MVS 推理配置

@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-from .camera_controller import CameraLocator, HikCamera, MvsCameraError
+from .camera_controller import CameraLocator, CameraPropertyConfig, HikCamera
 
 MVS_SOURCE_SCHEME = "mvs"
 DEFAULT_GRAB_TIMEOUT_MS = 1000
@@ -18,7 +18,29 @@ DEFAULT_GRAB_TIMEOUT_MS = 1000
 
 @dataclass(slots=True)
 class MvsCameraSourceConfig:
-    """工业相机源配置。"""
+    """工业相机源配置。
+    支持的参数：
+    - device_index: 设备索引
+    - serial_number: 序列号
+    - ip_address: IP 地址
+    - mac_address: MAC 地址
+    - grab_timeout_ms: 抓取超时时间（毫秒）
+    - trigger_mode: 触发模式
+    - pixel_format: 像素格式
+    - exposure_auto: 曝光自动模式
+    - exposure_time_us: 曝光时间（微秒）
+    - gain_auto: 增益自动模式
+    - gain: 增益
+    - gamma: 伽马
+    - acquisition_frame_rate_enable: 帧率使能
+    - acquisition_frame_rate: 帧率
+    - width: 宽度
+    - height: 高度
+    - offset_x: X 偏移
+    - offset_y: Y 偏移
+    - reverse_x: X 反转
+    - reverse_y: Y 反转
+    """
 
     device_index: int | None = 0
     serial_number: str | None = None
@@ -27,6 +49,19 @@ class MvsCameraSourceConfig:
     grab_timeout_ms: int = DEFAULT_GRAB_TIMEOUT_MS
     trigger_mode: str = "continuous"
     pixel_format: str = "bgr8"
+    exposure_auto: str | None = None
+    exposure_time_us: float | None = None
+    gain_auto: str | None = None
+    gain: float | None = None
+    gamma: float | None = None
+    acquisition_frame_rate_enable: bool | None = None
+    acquisition_frame_rate: float | None = None
+    width: int | None = None
+    height: int | None = None
+    offset_x: int | None = None
+    offset_y: int | None = None
+    reverse_x: bool | None = None
+    reverse_y: bool | None = None
 
 
 def is_mvs_source(source: str) -> bool:
@@ -44,6 +79,7 @@ def parse_mvs_source(source: str) -> MvsCameraSourceConfig:
     - `mvs://ip/192.168.1.10`
     - `mvs://mac/AA:BB:CC:DD:EE:FF`
     - `mvs://0?timeout_ms=2000&trigger=software&pixel_format=bgr8`
+    - `mvs://sn/ABC123?exposure_auto=off&exposure_time=6000&gain=8`
     """
     if not is_mvs_source(source):
         raise ValueError(f"Unsupported MVS source: {source}")
@@ -55,6 +91,19 @@ def parse_mvs_source(source: str) -> MvsCameraSourceConfig:
         grab_timeout_ms=int(query.get("timeout_ms", [DEFAULT_GRAB_TIMEOUT_MS])[0]),
         trigger_mode=query.get("trigger", ["continuous"])[0].lower(),
         pixel_format=query.get("pixel_format", ["bgr8"])[0].lower(),
+        exposure_auto=_first_query_value(query, "exposure_auto"),
+        exposure_time_us=_first_query_float(query, "exposure_time_us", "exposure_time"),
+        gain_auto=_first_query_value(query, "gain_auto"),
+        gain=_first_query_float(query, "gain"),
+        gamma=_first_query_float(query, "gamma"),
+        acquisition_frame_rate_enable=_first_query_bool(query, "frame_rate_enable", "acquisition_frame_rate_enable"),
+        acquisition_frame_rate=_first_query_float(query, "fps", "frame_rate", "acquisition_frame_rate"),
+        width=_first_query_int(query, "width"),
+        height=_first_query_int(query, "height"),
+        offset_x=_first_query_int(query, "offset_x"),
+        offset_y=_first_query_int(query, "offset_y"),
+        reverse_x=_first_query_bool(query, "reverse_x"),
+        reverse_y=_first_query_bool(query, "reverse_y"),
     )
 
     _apply_selector_from_url(config, parsed)
@@ -82,6 +131,21 @@ class MvsCameraCapture:
             ),
             trigger_mode=config.trigger_mode,
             pixel_format=config.pixel_format,
+            property_config=CameraPropertyConfig(
+                exposure_auto=config.exposure_auto,
+                exposure_time_us=config.exposure_time_us,
+                gain_auto=config.gain_auto,
+                gain=config.gain,
+                gamma=config.gamma,
+                acquisition_frame_rate_enable=config.acquisition_frame_rate_enable,
+                acquisition_frame_rate=config.acquisition_frame_rate,
+                width=config.width,
+                height=config.height,
+                offset_x=config.offset_x,
+                offset_y=config.offset_y,
+                reverse_x=config.reverse_x,
+                reverse_y=config.reverse_y,
+            ),
         )
         self._device_info = self._camera.open()
         self._camera.start_grabbing()
@@ -118,6 +182,7 @@ class MvsCameraCapture:
 
 
 def _apply_selector_from_url(config: MvsCameraSourceConfig, parsed) -> None:
+    """从 URL 中应用选择器。"""
     selector = (parsed.netloc or "").strip()
     remainder = parsed.path.strip("/")
 
@@ -133,6 +198,7 @@ def _apply_selector_from_url(config: MvsCameraSourceConfig, parsed) -> None:
 
 
 def _apply_selector_from_query(config: MvsCameraSourceConfig, query: dict[str, list[str]]) -> None:
+    """从查询参数中应用选择器。"""
     if "index" in query:
         config.device_index = int(query["index"][0])
     if "sn" in query:
@@ -150,6 +216,7 @@ def _apply_selector_from_query(config: MvsCameraSourceConfig, query: dict[str, l
 
 
 def _set_selector(config: MvsCameraSourceConfig, selector: str, value: str) -> None:
+    """设置选择器。"""
     if selector == "index":
         config.device_index = int(value)
         return
@@ -163,6 +230,7 @@ def _set_selector(config: MvsCameraSourceConfig, selector: str, value: str) -> N
 
 
 def _validate_selector(config: MvsCameraSourceConfig) -> None:
+    """验证选择器。"""
     selected = [
         config.device_index is not None,
         bool(config.serial_number),
@@ -171,3 +239,41 @@ def _validate_selector(config: MvsCameraSourceConfig) -> None:
     ]
     if sum(selected) > 1:
         raise ValueError("Only one camera selector can be set among index / serial / ip / mac")
+
+
+def _first_query_value(query: dict[str, list[str]], *keys: str) -> str | None:
+    """获取第一个存在的键值。"""
+    for key in keys:
+        if key in query and query[key]:
+            return query[key][0]
+    return None
+
+
+def _first_query_int(query: dict[str, list[str]], *keys: str) -> int | None:
+    """获取第一个存在的键值并转换为 int。"""
+    value = _first_query_value(query, *keys)
+    if value is None:
+        return None
+    return int(value)
+
+
+def _first_query_float(query: dict[str, list[str]], *keys: str) -> float | None:
+    """获取第一个存在的键值并转换为 float。"""
+    value = _first_query_value(query, *keys)
+    if value is None:
+        return None
+    return float(value)
+
+
+def _first_query_bool(query: dict[str, list[str]], *keys: str) -> bool | None:
+    """获取第一个存在的键值并转换为 bool。"""
+    value = _first_query_value(query, *keys)
+    if value is None:
+        return None
+
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"Unsupported boolean value '{value}', expected true/false")
