@@ -34,34 +34,23 @@ class InspectionStateMachine:
     def update(self, decision: ActionDecision) -> InspectionResult:
         """用当前帧动作结果驱动状态机向前推进。"""
         if not self.config.enabled:
-            return self._build_result(status="PENDING", current_state="disabled")
+            return self.snapshot()
 
         if any(decision.actions.values()):
             self._seen_positive_action = True
 
         if not self.config.steps:
-            return self._build_result(status="PENDING", current_state="stateless")
+            return self.snapshot()
 
         current_step = self.config.steps[self._step_index] if self._step_index < len(self.config.steps) else None
-        if current_step is None:
-            return self._build_result(status=self.config.ok_label, current_state="completed")
-
-        if decision.actions.get(current_step.action, False):
+        if current_step is not None and decision.actions.get(current_step.action, False):
             self._hold_count += 1
             if self._hold_count >= max(1, current_step.min_frames):
                 self._complete_current_step(decision.frame_index, current_step)
         else:
             self._hold_count = 0
 
-        if self._step_index >= len(self.config.steps):
-            return self._build_result(status=self.config.ok_label, current_state="completed")
-
-        next_step_name = self.config.steps[self._step_index].name
-        return self._build_result(
-            status="PENDING",
-            current_state="in_progress",
-            current_step=next_step_name,
-        )
+        return self.snapshot()
 
     def snapshot(self) -> InspectionResult:
         """返回当前流程状态快照，不消耗新的动作输入。"""

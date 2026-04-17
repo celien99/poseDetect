@@ -59,25 +59,6 @@ class DetectedSeatRegionProvider:
         return map_template_regions_to_detection(self.template_regions, detection)
 
 
-def build_seat_region_provider(
-    seat_regions: SeatRegions,
-    seat_model_path: str | None = None,
-    confidence: float = 0.25,
-    iou: float = 0.45,
-    device: str = "cpu",
-) -> SeatRegionProvider:
-    """构建座椅区域提供器。"""
-    if seat_model_path:
-        return DetectedSeatRegionProvider(
-            template_regions=seat_regions,
-            detector=SeatDetector(seat_model_path),
-            confidence=confidence,
-            iou=iou,
-            device=device,
-        )
-    return FixedSeatRegionProvider(seat_regions=seat_regions)
-
-
 def map_template_regions_to_detection(
     template_regions: SeatRegions,
     detection: SeatDetection,

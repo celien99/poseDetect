@@ -63,6 +63,26 @@ def test_parse_mvs_source_supports_camera_property_queries() -> None:
     assert config.reverse_y is True
 
 
+def test_mvs_camera_source_config_can_build_locator_and_property_config() -> None:
+    config = parse_mvs_source(
+        "mvs://sn/ABC123"
+        "?exposure_auto=off"
+        "&gain=8.5"
+        "&width=1920"
+        "&reverse_y=true",
+    )
+
+    locator = config.to_locator()
+    property_config = config.to_property_config()
+
+    assert locator.serial_number == "ABC123"
+    assert locator.device_index is None
+    assert property_config.exposure_auto == "off"
+    assert property_config.gain == 8.5
+    assert property_config.width == 1920
+    assert property_config.reverse_y is True
+
+
 def test_parse_mvs_source_rejects_invalid_boolean_query() -> None:
     try:
         parse_mvs_source("mvs://0?frame_rate_enable=maybe")

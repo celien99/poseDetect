@@ -29,7 +29,7 @@ class ActionRuleEvaluator:
 
     def __init__(self, config: RuleConfig | None = None) -> None:
         self.config = config or RuleConfig()
-        self.actions = self._resolve_actions(self.config)  # 当前启用的动作规则列表
+        self.actions = [action for action in self.config.actions if action.enabled]
         self._histories = {
             action.name: deque(maxlen=max(1, action.hold_frames))
             for action in self.actions
@@ -63,7 +63,13 @@ class ActionRuleEvaluator:
                 if states[action.name]
                 else "hold_frames_pending" if evaluation.candidate else evaluation.reason
             )
-        return self._build_decision(observation.frame_index, states, scores, reasons, diagnostics)
+        return ActionDecision(
+            frame_index=observation.frame_index,
+            actions=states,
+            scores=scores,
+            reasons=reasons,
+            diagnostics=diagnostics,
+        )
 
     def evaluate_snapshot(self, observation: FrameObservation) -> ActionDecision:
         """处理单帧快照，不使用历史帧连续判定。"""
@@ -78,7 +84,13 @@ class ActionRuleEvaluator:
             name: evaluation.diagnostics
             for name, evaluation in evaluations.items()
         }
-        return self._build_decision(observation.frame_index, states, scores, reasons, diagnostics)
+        return ActionDecision(
+            frame_index=observation.frame_index,
+            actions=states,
+            scores=scores,
+            reasons=reasons,
+            diagnostics=diagnostics,
+        )
 
     def empty_decision(self, frame_index: int) -> ActionDecision:
         """在未检测到人体时返回全 False 的空结果。"""
@@ -92,16 +104,18 @@ class ActionRuleEvaluator:
             }
             for action in self.actions
         }
-        return self._build_decision(frame_index, states, scores, reasons, diagnostics)
+        return ActionDecision(
+            frame_index=frame_index,
+            actions=states,
+            scores=scores,
+            reasons=reasons,
+            diagnostics=diagnostics,
+        )
 
     def reset(self) -> None:
         """清空连续帧历史，通常用于视频中断或当前帧无人时。"""
         for history in self._histories.values():
             history.clear()
-
-    def _resolve_actions(self, config: RuleConfig) -> list[ActionConfig]:
-        """解析当前启用的动作列表。"""
-        return [action for action in config.actions if action.enabled]
 
     def _held(self, history: deque[bool]) -> bool:
         """只有当历史窗口全部为真时，动作才算连续成立。"""
@@ -285,23 +299,6 @@ class ActionRuleEvaluator:
             raise ValueError(
                 f"Unknown seat region '{action.region}' for action '{action.name}'",
             ) from exc
-
-    def _build_decision(
-        self,
-        frame_index: int,
-        states: dict[str, bool],
-        scores: dict[str, float],
-        reasons: dict[str, str],
-        diagnostics: dict[str, dict[str, float | int | bool | str]],
-    ) -> ActionDecision:
-        """把动作状态封装为统一决策对象。"""
-        return ActionDecision(
-            frame_index=frame_index,
-            actions=states,
-            scores=scores,
-            reasons=reasons,
-            diagnostics=diagnostics,
-        )
 
     def _valid_wrist(self, point: Point) -> bool:
         """判断手腕关键点是否达到可用置信度。"""

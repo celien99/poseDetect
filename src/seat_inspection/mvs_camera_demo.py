@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Sequence
 import json
+from dataclasses import dataclass, replace
 from datetime import datetime
-from dataclasses import dataclass
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Any
 
 import cv2
@@ -15,7 +15,6 @@ from mvsCamera import (
     CameraPropertyConfig,
     HikCamera,
     MvsCameraError,
-    MvsCameraSourceConfig,
     parse_mvs_source,
 )
 
@@ -23,6 +22,21 @@ DEFAULT_TIMEOUT_MS = 1000
 DEFAULT_OUTPUT_DIR = "outputs/mvs_camera_demo"
 DEFAULT_WINDOW_NAME = "mvs-camera-demo"
 DEFAULT_SAVE_PREFIX = "capture"
+CLI_PROPERTY_FIELDS = {
+    "exposure_auto": "exposure_auto",
+    "exposure_time_us": "exposure_time_us",
+    "gain_auto": "gain_auto",
+    "gain": "gain",
+    "gamma": "gamma",
+    "frame_rate_enable": "acquisition_frame_rate_enable",
+    "fps": "acquisition_frame_rate",
+    "width": "width",
+    "height": "height",
+    "offset_x": "offset_x",
+    "offset_y": "offset_y",
+    "reverse_x": "reverse_x",
+    "reverse_y": "reverse_y",
+}
 
 
 @dataclass(slots=True)
@@ -66,23 +80,19 @@ def build_parser() -> argparse.ArgumentParser:
 
     selector_group = parser.add_argument_group("camera selector")
     selector_mutex = selector_group.add_mutually_exclusive_group()
-    selector_mutex.add_argument(
-        "--index",
-        type=int,
-        help="Select camera by enumeration index. Defaults to 0 when no selector is given.",
-    )
-    selector_mutex.add_argument(
-        "--serial-number",
-        help="Select camera by serial number",
-    )
-    selector_mutex.add_argument(
-        "--ip-address",
-        help="Select camera by IP address",
-    )
-    selector_mutex.add_argument(
-        "--mac-address",
-        help="Select camera by MAC address",
-    )
+    for option, kwargs in (
+        (
+            "--index",
+            {
+                "type": int,
+                "help": "Select camera by enumeration index. Defaults to 0 when no selector is given.",
+            },
+        ),
+        ("--serial-number", {"help": "Select camera by serial number"}),
+        ("--ip-address", {"help": "Select camera by IP address"}),
+        ("--mac-address", {"help": "Select camera by MAC address"}),
+    ):
+        selector_mutex.add_argument(option, **kwargs)
 
     parser.add_argument(
         "--trigger",
@@ -168,118 +178,31 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_false",
         help="Disable manual frame rate control",
     )
-    parser.set_defaults(frame_rate_enable=None)
 
-    parser.add_argument(
-        "--width",
-        type=int,
-        help="ROI width",
-    )
-    parser.add_argument(
-        "--height",
-        type=int,
-        help="ROI height",
-    )
-    parser.add_argument(
-        "--offset-x",
-        type=int,
-        help="ROI X offset",
-    )
-    parser.add_argument(
-        "--offset-y",
-        type=int,
-        help="ROI Y offset",
-    )
+    for option, help_text in (
+        ("--width", "ROI width"),
+        ("--height", "ROI height"),
+        ("--offset-x", "ROI X offset"),
+        ("--offset-y", "ROI Y offset"),
+    ):
+        parser.add_argument(option, type=int, help=help_text)
 
-    parser.add_argument(
-        "--reverse-x",
-        dest="reverse_x",
-        action="store_true",
-        help="Enable horizontal image reversal",
-    )
-    parser.add_argument(
-        "--no-reverse-x",
-        dest="reverse_x",
-        action="store_false",
-        help="Disable horizontal image reversal",
-    )
-    parser.add_argument(
-        "--reverse-y",
-        dest="reverse_y",
-        action="store_true",
-        help="Enable vertical image reversal",
-    )
-    parser.add_argument(
-        "--no-reverse-y",
-        dest="reverse_y",
-        action="store_false",
-        help="Disable vertical image reversal",
-    )
-    parser.set_defaults(reverse_x=None, reverse_y=None)
+    for axis, label in (("x", "horizontal"), ("y", "vertical")):
+        parser.add_argument(
+            f"--reverse-{axis}",
+            dest=f"reverse_{axis}",
+            action="store_true",
+            help=f"Enable {label} image reversal",
+        )
+        parser.add_argument(
+            f"--no-reverse-{axis}",
+            dest=f"reverse_{axis}",
+            action="store_false",
+            help=f"Disable {label} image reversal",
+        )
+
+    parser.set_defaults(frame_rate_enable=None, reverse_x=None, reverse_y=None)
     return parser
-
-
-def build_locator(args: argparse.Namespace) -> CameraLocator:
-    """Build camera selector config from parsed args."""
-    if args.serial_number:
-        return CameraLocator(
-            device_index=None,
-            serial_number=args.serial_number,
-        )
-    if args.ip_address:
-        return CameraLocator(
-            device_index=None,
-            ip_address=args.ip_address,
-        )
-    if args.mac_address:
-        return CameraLocator(
-            device_index=None,
-            mac_address=args.mac_address,
-        )
-    return CameraLocator(device_index=0 if args.index is None else args.index)
-
-
-def build_property_config(args: argparse.Namespace) -> CameraPropertyConfig:
-    """Build camera property config from parsed args."""
-    return CameraPropertyConfig(
-        exposure_auto=args.exposure_auto,
-        exposure_time_us=args.exposure_time_us,
-        gain_auto=args.gain_auto,
-        gain=args.gain,
-        gamma=args.gamma,
-        acquisition_frame_rate_enable=args.frame_rate_enable,
-        acquisition_frame_rate=args.fps,
-        width=args.width,
-        height=args.height,
-        offset_x=args.offset_x,
-        offset_y=args.offset_y,
-        reverse_x=args.reverse_x,
-        reverse_y=args.reverse_y,
-    )
-
-
-def resolve_actions(args: argparse.Namespace) -> SimpleNamespace:
-    """Normalize top-level actions so the demo has friendly defaults."""
-    preview = bool(args.preview)
-    if not args.list_devices and not args.capture and not preview:
-        preview = True
-    return SimpleNamespace(
-        list_devices=bool(args.list_devices),
-        capture_path=args.capture,
-        preview=preview,
-    )
-
-
-def resolve_actions_from_settings(*, list_devices: bool, capture_path: str | None, preview: bool) -> SimpleNamespace:
-    """Normalize actions after config and CLI options have been merged."""
-    final_preview = bool(preview)
-    if not list_devices and not capture_path and not final_preview:
-        final_preview = True
-    return SimpleNamespace(
-        list_devices=bool(list_devices),
-        capture_path=capture_path,
-        preview=final_preview,
-    )
 
 
 def format_device_info(device: Any) -> str:
@@ -339,20 +262,20 @@ def load_settings_from_config(config_path: str, camera_name: str | None = None) 
     """Load demo settings from a JSON file."""
     payload = json.loads(Path(config_path).read_text(encoding="utf-8"))
     demo_payload = payload.get("mvs_camera_demo")
-    if demo_payload is None and _looks_like_demo_payload(payload):
-        demo_payload = payload
-    if demo_payload is None:
-        demo_payload = {}
+    if not isinstance(demo_payload, dict):
+        demo_payload = payload if _looks_like_demo_payload(payload) else {}
 
-    selected_camera_name = camera_name or demo_payload.get("camera_name")
     source = demo_payload.get("source")
     if source is None:
-        source = _resolve_source_from_payload(payload, selected_camera_name)
+        source = _resolve_source_from_payload(
+            payload,
+            camera_name or demo_payload.get("camera_name"),
+        )
 
     source_config = parse_mvs_source(source)
     return DemoRunSettings(
-        locator=_build_locator_from_source_config(source_config),
-        property_config=_build_property_config_from_source_config(source_config),
+        locator=source_config.to_locator(),
+        property_config=source_config.to_property_config(),
         trigger_mode=demo_payload.get("trigger", source_config.trigger_mode),
         pixel_format=demo_payload.get("pixel_format", source_config.pixel_format),
         timeout_ms=int(demo_payload.get("timeout_ms", source_config.grab_timeout_ms)),
@@ -368,19 +291,27 @@ def load_settings_from_config(config_path: str, camera_name: str | None = None) 
 def merge_settings(args: argparse.Namespace, file_settings: DemoRunSettings | None) -> DemoRunSettings:
     """Merge CLI options on top of configuration-file settings."""
     base = file_settings or DemoRunSettings(
-        locator=CameraLocator(device_index=0),
+        locator=CameraLocator(),
         property_config=CameraPropertyConfig(),
     )
+    capture_path = args.capture if args.capture is not None else base.capture_path
+    preview = bool(args.preview or base.preview)
+    if capture_path is None and not preview:
+        preview = True
 
-    if _has_selector_override(args):
-        locator = build_locator(args)
-    else:
-        locator = base.locator
-
-    cli_property_config = build_property_config(args)
+    locator_overrides = _selector_overrides_from_args(args)
+    property_overrides = {
+        target_name: value
+        for arg_name, target_name in CLI_PROPERTY_FIELDS.items()
+        if (value := getattr(args, arg_name)) is not None
+    }
     return DemoRunSettings(
-        locator=locator,
-        property_config=_merge_property_configs(base.property_config, cli_property_config),
+        locator=replace(base.locator, **locator_overrides) if locator_overrides else base.locator,
+        property_config=(
+            replace(base.property_config, **property_overrides)
+            if property_overrides
+            else base.property_config
+        ),
         trigger_mode=args.trigger or base.trigger_mode,
         pixel_format=args.pixel_format or base.pixel_format,
         timeout_ms=base.timeout_ms if args.timeout_ms is None else args.timeout_ms,
@@ -388,9 +319,42 @@ def merge_settings(args: argparse.Namespace, file_settings: DemoRunSettings | No
         save_prefix=args.save_prefix or base.save_prefix,
         window_name=args.window_name or base.window_name,
         show_nodes=bool(args.show_nodes or base.show_nodes),
-        preview=bool(args.preview or base.preview),
-        capture_path=args.capture if args.capture is not None else base.capture_path,
+        preview=preview,
+        capture_path=capture_path,
     )
+
+
+def _selector_overrides_from_args(args: argparse.Namespace) -> dict[str, Any]:
+    """Return locator overrides from CLI, clearing other selectors when needed."""
+    if args.serial_number:
+        return {
+            "device_index": None,
+            "serial_number": args.serial_number,
+            "ip_address": None,
+            "mac_address": None,
+        }
+    if args.ip_address:
+        return {
+            "device_index": None,
+            "serial_number": None,
+            "ip_address": args.ip_address,
+            "mac_address": None,
+        }
+    if args.mac_address:
+        return {
+            "device_index": None,
+            "serial_number": None,
+            "ip_address": None,
+            "mac_address": args.mac_address,
+        }
+    if args.index is not None:
+        return {
+            "device_index": args.index,
+            "serial_number": None,
+            "ip_address": None,
+            "mac_address": None,
+        }
+    return {}
 
 
 def _looks_like_demo_payload(payload: dict[str, Any]) -> bool:
@@ -436,77 +400,6 @@ def _resolve_source_from_payload(payload: dict[str, Any], camera_name: str | Non
     raise ValueError("Unable to resolve a camera source from the config file")
 
 
-def _build_locator_from_source_config(config: MvsCameraSourceConfig) -> CameraLocator:
-    """Build a locator object from a parsed source string."""
-    return CameraLocator(
-        device_index=config.device_index,
-        serial_number=config.serial_number,
-        ip_address=config.ip_address,
-        mac_address=config.mac_address,
-    )
-
-
-def _build_property_config_from_source_config(config: MvsCameraSourceConfig) -> CameraPropertyConfig:
-    """Build property settings from a parsed source string."""
-    return CameraPropertyConfig(
-        exposure_auto=config.exposure_auto,
-        exposure_time_us=config.exposure_time_us,
-        gain_auto=config.gain_auto,
-        gain=config.gain,
-        gamma=config.gamma,
-        acquisition_frame_rate_enable=config.acquisition_frame_rate_enable,
-        acquisition_frame_rate=config.acquisition_frame_rate,
-        width=config.width,
-        height=config.height,
-        offset_x=config.offset_x,
-        offset_y=config.offset_y,
-        reverse_x=config.reverse_x,
-        reverse_y=config.reverse_y,
-    )
-
-
-def _has_selector_override(args: argparse.Namespace) -> bool:
-    """Return whether CLI selectors should override config-file selectors."""
-    return any(
-        value is not None
-        for value in (
-            args.index,
-            args.serial_number,
-            args.ip_address,
-            args.mac_address,
-        )
-    )
-
-
-def _merge_property_configs(base: CameraPropertyConfig, override: CameraPropertyConfig) -> CameraPropertyConfig:
-    """Merge property configs while preserving config-file defaults."""
-    return CameraPropertyConfig(
-        exposure_auto=override.exposure_auto if override.exposure_auto is not None else base.exposure_auto,
-        exposure_time_us=(
-            override.exposure_time_us if override.exposure_time_us is not None else base.exposure_time_us
-        ),
-        gain_auto=override.gain_auto if override.gain_auto is not None else base.gain_auto,
-        gain=override.gain if override.gain is not None else base.gain,
-        gamma=override.gamma if override.gamma is not None else base.gamma,
-        acquisition_frame_rate_enable=(
-            override.acquisition_frame_rate_enable
-            if override.acquisition_frame_rate_enable is not None
-            else base.acquisition_frame_rate_enable
-        ),
-        acquisition_frame_rate=(
-            override.acquisition_frame_rate
-            if override.acquisition_frame_rate is not None
-            else base.acquisition_frame_rate
-        ),
-        width=override.width if override.width is not None else base.width,
-        height=override.height if override.height is not None else base.height,
-        offset_x=override.offset_x if override.offset_x is not None else base.offset_x,
-        offset_y=override.offset_y if override.offset_y is not None else base.offset_y,
-        reverse_x=override.reverse_x if override.reverse_x is not None else base.reverse_x,
-        reverse_y=override.reverse_y if override.reverse_y is not None else base.reverse_y,
-    )
-
-
 def list_devices() -> int:
     """List visible MVS devices."""
     camera = HikCamera()
@@ -523,7 +416,7 @@ def list_devices() -> int:
         camera.close()
 
 
-def run_capture(settings: DemoRunSettings, actions: SimpleNamespace) -> int:
+def run_capture(settings: DemoRunSettings) -> int:
     """Open one camera and run capture or preview actions."""
     camera = HikCamera(
         locator=settings.locator,
@@ -539,13 +432,13 @@ def run_capture(settings: DemoRunSettings, actions: SimpleNamespace) -> int:
         if settings.show_nodes:
             print_camera_nodes(camera)
 
-        if actions.capture_path:
+        if settings.capture_path:
             frame = capture_frame(camera, settings.timeout_ms)
-            output_path = save_frame(frame, actions.capture_path)
+            output_path = save_frame(frame, settings.capture_path)
             print(f"Captured photo saved to: {output_path}")
             return 0
 
-        if actions.preview:
+        if settings.preview:
             run_preview_loop(
                 camera=camera,
                 timeout_ms=settings.timeout_ms,
@@ -553,8 +446,6 @@ def run_capture(settings: DemoRunSettings, actions: SimpleNamespace) -> int:
                 save_prefix=settings.save_prefix,
                 window_name=settings.window_name,
             )
-            return 0
-
         return 0
     finally:
         try:
@@ -594,21 +485,16 @@ def run_preview_loop(
             print(f"Saved photo to: {output_path}")
 
 
-def main() -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     """CLI entry point for the standalone MVS demo."""
     parser = build_parser()
-    args = parser.parse_args()
+    args = parser.parse_args() if argv is None else parser.parse_args(list(argv))
+    if args.list_devices:
+        return list_devices()
+
     file_settings = load_settings_from_config(args.config, args.camera_name) if args.config else None
     settings = merge_settings(args, file_settings)
-    actions = resolve_actions_from_settings(
-        list_devices=bool(args.list_devices),
-        capture_path=settings.capture_path,
-        preview=settings.preview,
-    )
-
-    if actions.list_devices:
-        return list_devices()
-    return run_capture(settings, actions)
+    return run_capture(settings)
 
 
 if __name__ == "__main__":

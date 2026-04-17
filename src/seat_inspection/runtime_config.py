@@ -32,78 +32,51 @@ class RuntimeConfigBundle:
 def load_runtime_config(path: str) -> RuntimeConfigBundle:
     """从 JSON 文件加载多机位协同推理配置。"""
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
-    return RuntimeConfigBundle(
-        multi_camera_inference=_build_multi_camera_inference_config(
-            payload.get("multi_camera_inference"),
-        ),
-        rules=_build_rule_config(payload.get("rules", {})),
-    )
+    rule_payload = dict(payload.get("rules") or {})
+    rule_actions = rule_payload.pop("actions", None)
+    legacy_action_options = _pop_legacy_rule_action_options(rule_payload)
 
-
-def _build_multi_camera_inference_config(
-    payload: dict[str, Any] | None,
-) -> MultiCameraInferenceConfig | None:
-    """构造多相机推理配置。"""
-    if payload is None:
-        return None
-
-    config_payload = dict(payload)
-    config_payload["cameras"] = [
-        _build_camera_inference_config(camera_payload)
-        for camera_payload in config_payload.get("cameras", [])
-    ]
-    config_payload["fusion"] = _build_multi_camera_fusion_config(
-        config_payload.get("fusion"),
-    )
-    config_payload["keypoint_processing"] = _build_keypoint_processing_config(
-        config_payload.get("keypoint_processing"),
-    )
-    config_payload["state_machine"] = _build_state_machine_config(
-        config_payload.get("state_machine"),
-    )
-    return MultiCameraInferenceConfig(**config_payload)
-
-
-def _build_keypoint_processing_config(payload: dict[str, Any] | None) -> KeypointProcessingConfig:
-    """构造关键点时序处理配置。"""
-    if payload is None:
-        return KeypointProcessingConfig()
-    return KeypointProcessingConfig(**payload)
-
-
-def _build_state_machine_config(payload: dict[str, Any] | None) -> StateMachineConfig:
-    """构造流程状态机配置。"""
-    if payload is None:
-        return StateMachineConfig()
-
-    config_payload = dict(payload)
-    config_payload["steps"] = [
-        WorkflowStepConfig(**step_payload)
-        for step_payload in config_payload.get("steps", [])
-    ]
-    return StateMachineConfig(**config_payload)
-
-
-def _build_multi_camera_fusion_config(payload: dict[str, Any] | None) -> MultiCameraFusionConfig:
-    """构造多相机融合配置。"""
-    if payload is None:
-        return MultiCameraFusionConfig()
-    return MultiCameraFusionConfig(**payload)
-
-
-def _build_rule_config(payload: dict[str, Any]) -> RuleConfig:
-    """构造动作规则配置，同时兼容旧版固定动作字段。"""
-    config_payload = dict(payload)
-    action_payloads = config_payload.pop("actions", None)
-    legacy_action_options = _pop_legacy_rule_action_options(config_payload)
-    if action_payloads is None:
-        config_payload["actions"] = build_default_rule_actions(**legacy_action_options)
-    else:
-        config_payload["actions"] = [
-            ActionConfig(**action_payload)
-            for action_payload in action_payloads
+    multi_camera_payload = payload.get("multi_camera_inference")
+    multi_camera_inference = None
+    if multi_camera_payload is not None:
+        inference_payload = dict(multi_camera_payload)
+        state_machine_payload = dict(inference_payload.pop("state_machine", {}) or {})
+        state_machine_steps = [
+            WorkflowStepConfig(**step_payload)
+            for step_payload in state_machine_payload.pop("steps", [])
         ]
-    return RuleConfig(**config_payload)
+        inference_payload["cameras"] = [
+            CameraInferenceConfig(
+                **{
+                    **camera_payload,
+                    "seat_regions": _build_seat_regions(camera_payload["seat_regions"]),
+                },
+            )
+            for camera_payload in inference_payload.get("cameras", [])
+        ]
+        inference_payload["fusion"] = MultiCameraFusionConfig(
+            **(inference_payload.pop("fusion", {}) or {}),
+        )
+        inference_payload["keypoint_processing"] = KeypointProcessingConfig(
+            **(inference_payload.pop("keypoint_processing", {}) or {}),
+        )
+        inference_payload["state_machine"] = StateMachineConfig(
+            **state_machine_payload,
+            steps=state_machine_steps,
+        )
+        multi_camera_inference = MultiCameraInferenceConfig(**inference_payload)
+
+    return RuntimeConfigBundle(
+        multi_camera_inference=multi_camera_inference,
+        rules=RuleConfig(
+            **rule_payload,
+            actions=(
+                build_default_rule_actions(**legacy_action_options)
+                if rule_actions is None
+                else [ActionConfig(**action_payload) for action_payload in rule_actions]
+            ),
+        ),
+    )
 
 
 def _pop_legacy_rule_action_options(payload: dict[str, Any]) -> dict[str, Any]:
@@ -126,13 +99,6 @@ def _pop_legacy_rule_action_options(payload: dict[str, Any]) -> dict[str, Any]:
     if lift_ratio_threshold is not None:
         options["lift_ratio_threshold"] = float(lift_ratio_threshold)
     return options
-
-
-def _build_camera_inference_config(payload: dict[str, Any]) -> CameraInferenceConfig:
-    """构造多相机模式下的单路相机配置。"""
-    config_payload = dict(payload)
-    config_payload["seat_regions"] = _build_seat_regions(config_payload["seat_regions"])
-    return CameraInferenceConfig(**config_payload)
 
 
 def _build_seat_regions(payload: dict[str, Any]) -> SeatRegions:

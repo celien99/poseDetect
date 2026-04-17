@@ -1,65 +1,64 @@
 from __future__ import annotations
 
-import argparse
 import json
 
 import numpy as np
 
-from seat_inspection.mvs_camera_demo import (
-    build_locator,
-    build_property_config,
-    load_settings_from_config,
-    merge_settings,
-    resolve_actions,
-    save_frame,
-)
+from seat_inspection.mvs_camera_demo import build_parser, load_settings_from_config, main, merge_settings, save_frame
 
 
-def test_build_locator_prefers_serial_number() -> None:
-    locator = build_locator(
-        argparse.Namespace(
-            index=3,
-            serial_number="DA9184658",
-            ip_address=None,
-            mac_address=None,
-        ),
+def parse_args(*argv: str):
+    return build_parser().parse_args(list(argv))
+
+
+def test_merge_settings_builds_locator_from_serial_number() -> None:
+    settings = merge_settings(
+        parse_args("--serial-number", "DA9184658"),
+        None,
     )
 
-    assert locator.device_index is None
-    assert locator.serial_number == "DA9184658"
+    assert settings.locator.device_index is None
+    assert settings.locator.serial_number == "DA9184658"
 
 
-def test_build_locator_defaults_to_index_zero() -> None:
-    locator = build_locator(
-        argparse.Namespace(
-            index=None,
-            serial_number=None,
-            ip_address=None,
-            mac_address=None,
+def test_merge_settings_defaults_to_index_zero_and_preview() -> None:
+    settings = merge_settings(parse_args(), None)
+
+    assert settings.locator.device_index == 0
+    assert settings.preview is True
+    assert settings.capture_path is None
+
+
+def test_merge_settings_maps_optional_property_values() -> None:
+    settings = merge_settings(
+        parse_args(
+            "--exposure-auto",
+            "off",
+            "--exposure-time-us",
+            "6000",
+            "--gain-auto",
+            "continuous",
+            "--gain",
+            "8.5",
+            "--gamma",
+            "0.7",
+            "--frame-rate-enable",
+            "--fps",
+            "12.5",
+            "--width",
+            "1920",
+            "--height",
+            "1080",
+            "--offset-x",
+            "16",
+            "--offset-y",
+            "24",
+            "--no-reverse-x",
+            "--reverse-y",
         ),
+        None,
     )
-
-    assert locator.device_index == 0
-
-
-def test_build_property_config_maps_optional_values() -> None:
-    config = build_property_config(
-        argparse.Namespace(
-            exposure_auto="off",
-            exposure_time_us=6000.0,
-            gain_auto="continuous",
-            gain=8.5,
-            gamma=0.7,
-            frame_rate_enable=True,
-            fps=12.5,
-            width=1920,
-            height=1080,
-            offset_x=16,
-            offset_y=24,
-            reverse_x=False,
-            reverse_y=True,
-        ),
-    )
+    config = settings.property_config
 
     assert config.exposure_auto == "off"
     assert config.exposure_time_us == 6000.0
@@ -74,20 +73,6 @@ def test_build_property_config_maps_optional_values() -> None:
     assert config.offset_y == 24
     assert config.reverse_x is False
     assert config.reverse_y is True
-
-
-def test_resolve_actions_defaults_to_preview() -> None:
-    actions = resolve_actions(
-        argparse.Namespace(
-            list_devices=False,
-            capture=None,
-            preview=False,
-        ),
-    )
-
-    assert actions.list_devices is False
-    assert actions.capture_path is None
-    assert actions.preview is True
 
 
 def test_save_frame_creates_output_file(tmp_path) -> None:
@@ -164,37 +149,16 @@ def test_load_settings_from_direct_demo_source(tmp_path) -> None:
 
 
 def test_merge_settings_lets_cli_override_config_values() -> None:
-    file_settings = load_settings_from_config_payload_for_merge()
+    file_settings = load_settings_from_config_payload(
+        {
+            "mvs_camera_demo": {
+                "source": "mvs://sn/DA9184658?timeout_ms=1000&exposure_auto=off&exposure_time=5000&gain_auto=off&gain=6",
+            },
+        },
+    )
 
     merged = merge_settings(
-        argparse.Namespace(
-            index=None,
-            serial_number=None,
-            ip_address=None,
-            mac_address=None,
-            exposure_auto=None,
-            exposure_time_us=9000.0,
-            gain_auto=None,
-            gain=10.0,
-            gamma=None,
-            frame_rate_enable=None,
-            fps=None,
-            width=None,
-            height=None,
-            offset_x=None,
-            offset_y=None,
-            reverse_x=None,
-            reverse_y=None,
-            trigger=None,
-            pixel_format=None,
-            timeout_ms=None,
-            output_dir=None,
-            save_prefix=None,
-            window_name=None,
-            show_nodes=False,
-            preview=False,
-            capture=None,
-        ),
+        parse_args("--exposure-time-us", "9000", "--gain", "10"),
         file_settings,
     )
 
@@ -203,14 +167,26 @@ def test_merge_settings_lets_cli_override_config_values() -> None:
     assert merged.locator.serial_number == "DA9184658"
 
 
-def load_settings_from_config_payload_for_merge():
-    return load_settings_from_config_payload(
-        {
-            "mvs_camera_demo": {
-                "source": "mvs://sn/DA9184658?timeout_ms=1000&exposure_auto=off&exposure_time=5000&gain_auto=off&gain=6",
-            },
-        },
+def test_main_list_devices_short_circuits_before_loading_config(monkeypatch) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_list_devices() -> int:
+        captured["listed"] = True
+        return 0
+
+    monkeypatch.setattr(
+        "seat_inspection.mvs_camera_demo.list_devices",
+        fake_list_devices,
     )
+    monkeypatch.setattr(
+        "seat_inspection.mvs_camera_demo.load_settings_from_config",
+        lambda *_args, **_kwargs: captured.setdefault("loaded", True),
+    )
+
+    exit_code = main(["--list-devices", "--config", "demo.json"])
+
+    assert exit_code == 0
+    assert captured == {"listed": True}
 
 
 def load_settings_from_config_payload(payload: dict):

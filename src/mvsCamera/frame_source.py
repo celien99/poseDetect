@@ -63,6 +63,33 @@ class MvsCameraSourceConfig:
     reverse_x: bool | None = None
     reverse_y: bool | None = None
 
+    def to_locator(self) -> CameraLocator:
+        """转换为相机定位配置。"""
+        return CameraLocator(
+            device_index=self.device_index,
+            serial_number=self.serial_number,
+            ip_address=self.ip_address,
+            mac_address=self.mac_address,
+        )
+
+    def to_property_config(self) -> CameraPropertyConfig:
+        """转换为相机属性配置。"""
+        return CameraPropertyConfig(
+            exposure_auto=self.exposure_auto,
+            exposure_time_us=self.exposure_time_us,
+            gain_auto=self.gain_auto,
+            gain=self.gain,
+            gamma=self.gamma,
+            acquisition_frame_rate_enable=self.acquisition_frame_rate_enable,
+            acquisition_frame_rate=self.acquisition_frame_rate,
+            width=self.width,
+            height=self.height,
+            offset_x=self.offset_x,
+            offset_y=self.offset_y,
+            reverse_x=self.reverse_x,
+            reverse_y=self.reverse_y,
+        )
+
 
 def is_mvs_source(source: str) -> bool:
     """判断给定源是否为 `mvs://` 工业相机地址。"""
@@ -123,29 +150,10 @@ class MvsCameraCapture:
     def __init__(self, config: MvsCameraSourceConfig) -> None:
         self._config = config
         self._camera = HikCamera(
-            locator=CameraLocator(
-                device_index=config.device_index,
-                serial_number=config.serial_number,
-                ip_address=config.ip_address,
-                mac_address=config.mac_address,
-            ),
+            locator=config.to_locator(),
             trigger_mode=config.trigger_mode,
             pixel_format=config.pixel_format,
-            property_config=CameraPropertyConfig(
-                exposure_auto=config.exposure_auto,
-                exposure_time_us=config.exposure_time_us,
-                gain_auto=config.gain_auto,
-                gain=config.gain,
-                gamma=config.gamma,
-                acquisition_frame_rate_enable=config.acquisition_frame_rate_enable,
-                acquisition_frame_rate=config.acquisition_frame_rate,
-                width=config.width,
-                height=config.height,
-                offset_x=config.offset_x,
-                offset_y=config.offset_y,
-                reverse_x=config.reverse_x,
-                reverse_y=config.reverse_y,
-            ),
+            property_config=config.to_property_config(),
         )
         self._device_info = self._camera.open()
         self._camera.start_grabbing()

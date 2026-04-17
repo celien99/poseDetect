@@ -20,9 +20,10 @@ from .multi_camera import CameraDecisionSample, fuse_camera_decisions
 from .person_detection import PersonDetector
 from .pipeline import InspectionPipeline
 from .pose_estimation import PoseEstimator
-from .region_provider import build_seat_region_provider
+from .region_provider import DetectedSeatRegionProvider, FixedSeatRegionProvider
 from .reporting import export_action_report
 from .schemas import ActionDecision, FrameObservation
+from .seat_detection import SeatDetector
 from .state_machine import InspectionStateMachine
 from .tracking import (
     MultiCameraOperatorAssociator,
@@ -212,15 +213,19 @@ def _build_pipeline(
         keypoint_processing,
         state_machine,
     )
-    return InspectionPipeline(
-        pose_estimator=PoseEstimator(pose_model_path),
-        seat_region_provider=build_seat_region_provider(
-            seat_regions,
-            seat_model_path,
+    if seat_model_path:
+        seat_region_provider = DetectedSeatRegionProvider(
+            template_regions=seat_regions,
+            detector=SeatDetector(seat_model_path),
             confidence=confidence,
             iou=iou,
             device=device,
-        ),
+        )
+    else:
+        seat_region_provider = FixedSeatRegionProvider(seat_regions=seat_regions)
+    return InspectionPipeline(
+        pose_estimator=PoseEstimator(pose_model_path),
+        seat_region_provider=seat_region_provider,
         engine=engine,
         confidence=confidence,
         iou=iou,

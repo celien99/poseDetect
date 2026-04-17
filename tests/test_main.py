@@ -1,30 +1,10 @@
-import argparse
 from types import SimpleNamespace
 
 import seat_inspection.main as main_module
 
 
-class StubParser:
-    def __init__(self, namespace: argparse.Namespace) -> None:
-        self._namespace = namespace
-
-    def parse_args(self) -> argparse.Namespace:
-        return self._namespace
-
-
 def test_main_infer_runs_multi_camera_entry(monkeypatch, capsys) -> None:
     captured: dict[str, object] = {}
-
-    monkeypatch.setattr(
-        main_module,
-        "build_parser",
-        lambda: StubParser(
-            argparse.Namespace(
-                command="infer",
-                config="configs/runtime.multi_camera.example.json",
-            ),
-        ),
-    )
 
     fake_runtime_config = SimpleNamespace(
         multi_camera_inference=SimpleNamespace(
@@ -51,7 +31,13 @@ def test_main_infer_runs_multi_camera_entry(monkeypatch, capsys) -> None:
     )
     monkeypatch.setitem(sys.modules, "seat_inspection.inference", fake_inference_module)
 
-    main_module.main()
+    main_module.main(
+        [
+            "infer",
+            "--config",
+            "configs/runtime.multi_camera.example.json",
+        ],
+    )
 
     stdout = capsys.readouterr().out
     assert captured["config_path"] == "configs/runtime.multi_camera.example.json"
@@ -62,18 +48,6 @@ def test_main_infer_runs_multi_camera_entry(monkeypatch, capsys) -> None:
 
 def test_main_capture_setup_runs_capture_command(monkeypatch, capsys) -> None:
     captured: dict[str, object] = {}
-
-    monkeypatch.setattr(
-        main_module,
-        "build_parser",
-        lambda: StubParser(
-            argparse.Namespace(
-                command="capture-setup",
-                config="configs/multi_camera_setup.example.json",
-                output_dir="outputs/setup_capture",
-            ),
-        ),
-    )
 
     import sys
 
@@ -92,7 +66,15 @@ def test_main_capture_setup_runs_capture_command(monkeypatch, capsys) -> None:
     )
     monkeypatch.setitem(sys.modules, "seat_inspection.camera_setup", fake_setup_module)
 
-    main_module.main()
+    main_module.main(
+        [
+            "capture-setup",
+            "--config",
+            "configs/multi_camera_setup.example.json",
+            "--output-dir",
+            "outputs/setup_capture",
+        ],
+    )
 
     stdout = capsys.readouterr().out
     assert captured["config_path"] == "configs/multi_camera_setup.example.json"
@@ -102,18 +84,6 @@ def test_main_capture_setup_runs_capture_command(monkeypatch, capsys) -> None:
 
 def test_main_annotate_setup_runs_annotation_command(monkeypatch, capsys) -> None:
     captured: dict[str, object] = {}
-
-    monkeypatch.setattr(
-        main_module,
-        "build_parser",
-        lambda: StubParser(
-            argparse.Namespace(
-                command="annotate-setup",
-                capture_dir="outputs/setup_capture",
-                output="outputs/setup_capture/seat_regions.annotations.json",
-            ),
-        ),
-    )
 
     import sys
 
@@ -128,7 +98,15 @@ def test_main_annotate_setup_runs_annotation_command(monkeypatch, capsys) -> Non
     )
     monkeypatch.setitem(sys.modules, "seat_inspection.camera_setup", fake_setup_module)
 
-    main_module.main()
+    main_module.main(
+        [
+            "annotate-setup",
+            "--capture-dir",
+            "outputs/setup_capture",
+            "--output",
+            "outputs/setup_capture/seat_regions.annotations.json",
+        ],
+    )
 
     stdout = capsys.readouterr().out
     assert captured["capture_dir"] == "outputs/setup_capture"
@@ -138,19 +116,6 @@ def test_main_annotate_setup_runs_annotation_command(monkeypatch, capsys) -> Non
 
 def test_main_apply_setup_runs_apply_command(monkeypatch, capsys) -> None:
     captured: dict[str, object] = {}
-
-    monkeypatch.setattr(
-        main_module,
-        "build_parser",
-        lambda: StubParser(
-            argparse.Namespace(
-                command="apply-setup",
-                annotations="outputs/setup_capture/seat_regions.annotations.json",
-                runtime_config="configs/runtime.multi_camera.example.json",
-                output="configs/runtime.multi_camera.updated.json",
-            ),
-        ),
-    )
 
     import sys
 
@@ -166,7 +131,17 @@ def test_main_apply_setup_runs_apply_command(monkeypatch, capsys) -> None:
     )
     monkeypatch.setitem(sys.modules, "seat_inspection.camera_setup", fake_setup_module)
 
-    main_module.main()
+    main_module.main(
+        [
+            "apply-setup",
+            "--annotations",
+            "outputs/setup_capture/seat_regions.annotations.json",
+            "--runtime-config",
+            "configs/runtime.multi_camera.example.json",
+            "--output",
+            "configs/runtime.multi_camera.updated.json",
+        ],
+    )
 
     stdout = capsys.readouterr().out
     assert captured["annotation_path"] == "outputs/setup_capture/seat_regions.annotations.json"
@@ -177,21 +152,6 @@ def test_main_apply_setup_runs_apply_command(monkeypatch, capsys) -> None:
 
 def test_main_setup_seat_regions_runs_full_setup_command(monkeypatch, capsys) -> None:
     captured: dict[str, object] = {}
-
-    monkeypatch.setattr(
-        main_module,
-        "build_parser",
-        lambda: StubParser(
-            argparse.Namespace(
-                command="setup-seat-regions",
-                setup_config="configs/multi_camera_setup.example.json",
-                runtime_config="configs/runtime.multi_camera.example.json",
-                capture_dir="outputs/setup_capture",
-                annotation_output="outputs/setup_capture/seat_regions.annotations.json",
-                output_runtime_config="configs/runtime.multi_camera.ready.json",
-            ),
-        ),
-    )
 
     import sys
 
@@ -216,7 +176,21 @@ def test_main_setup_seat_regions_runs_full_setup_command(monkeypatch, capsys) ->
     )
     monkeypatch.setitem(sys.modules, "seat_inspection.camera_setup", fake_setup_module)
 
-    main_module.main()
+    main_module.main(
+        [
+            "setup-seat-regions",
+            "--setup-config",
+            "configs/multi_camera_setup.example.json",
+            "--runtime-config",
+            "configs/runtime.multi_camera.example.json",
+            "--capture-dir",
+            "outputs/setup_capture",
+            "--annotation-output",
+            "outputs/setup_capture/seat_regions.annotations.json",
+            "--output-runtime-config",
+            "configs/runtime.multi_camera.ready.json",
+        ],
+    )
 
     stdout = capsys.readouterr().out
     assert captured["setup_config_path"] == "configs/multi_camera_setup.example.json"

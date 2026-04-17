@@ -29,11 +29,6 @@ class SeatDetector:
         self.model_path = model_path
         self._model = None
 
-    @property
-    def enabled(self) -> bool:
-        """返回是否启用了独立座椅检测模型。"""
-        return self.model_path is not None
-
     def detect(
         self,
         frame: Any,

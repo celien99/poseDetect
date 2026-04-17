@@ -1,20 +1,20 @@
 from seat_inspection.region_provider import (
     DetectedSeatRegionProvider,
-    build_seat_region_provider,
+    FixedSeatRegionProvider,
     map_template_regions_to_detection,
 )
 from seat_inspection.schemas import BoundingBox, SeatRegions
 from seat_inspection.seat_detection import SeatDetection
 
 
-def test_build_seat_region_provider_returns_fixed_regions() -> None:
+def test_fixed_seat_region_provider_returns_fixed_regions() -> None:
     regions = SeatRegions(
         overall=BoundingBox(1, 2, 3, 4),
         side_surface=BoundingBox(5, 6, 7, 8),
         bottom_surface=BoundingBox(9, 10, 11, 12),
     )
 
-    provider = build_seat_region_provider(regions)
+    provider = FixedSeatRegionProvider(regions)
     resolved = provider.get_regions(frame=None)
 
     assert resolved == regions
