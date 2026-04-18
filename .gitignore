@@ -15,8 +15,7 @@ dist/
 *.egg-info/
 .eggs/
 
-# Test / coverage artifacts
-.pytest_cache/
+# Coverage artifacts
 .coverage
 coverage.xml
 htmlcov/

@@ -63,7 +63,6 @@ Python 3.10+ is recommended.
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
-pip install -e .[dev]
 ```
 
 ## Setup Workflow
@@ -255,24 +254,6 @@ When visualization is enabled, the preview also shows:
 - selected operator box and track id
 - fused operator association id
 - per-camera placeholders for dropped or offline views
-
-## Testing
-
-```bash
-.venv/bin/pytest -q
-```
-
-The current test suite covers:
-
-- config parsing
-- setup capture and annotation
-- media input normalization
-- rule evaluation
-- pipeline gap handling
-- multi-camera fusion
-- reporting
-- tracking
-- multi-camera inference integration flow
 
 ## Documentation Policy
 

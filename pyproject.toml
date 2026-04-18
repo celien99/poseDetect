@@ -13,11 +13,6 @@ dependencies = [
   "opencv-python",
 ]
 
-[project.optional-dependencies]
-dev = [
-  "pytest",
-]
-
 [project.scripts]
 seat-inspection = "seat_inspection.main:main"
 seat-inspection-mvs-demo = "seat_inspection.mvs_camera_demo:main"

@@ -70,7 +70,6 @@
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
-pip install -e .[dev]
 ```
 
 ## 五、搭建流程：先拍照，再标注
@@ -263,25 +262,7 @@ seat-inspection infer --config configs/runtime.multi_camera.example.json
 - 融合后的操作者关联 ID
 - 掉帧或离线机位的占位画面
 
-## 十、测试
-
-```bash
-.venv/bin/pytest -q
-```
-
-当前测试覆盖：
-
-- 配置解析
-- 拍照与标注流程
-- 输入流标准化
-- 规则判断
-- 流水线断帧处理
-- 多机位融合
-- 报告输出
-- 主操作者跟踪
-- 多机位主流程联调
-
-## 十一、文档策略
+## 十、文档策略
 
 当前仓库以 README 为唯一真实文档入口。
 
